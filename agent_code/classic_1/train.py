@@ -115,7 +115,6 @@ RECORD_ENEMY_TRANSITIONS = 1.0
 # Events
 PLACEHOLDER_EVENT = "PLACEHOLDER"
 
-
 def setup_training(self):
     # Initial exploration rate is set to 1.0
     self.exploration_rate = 1.0
