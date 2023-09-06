@@ -142,11 +142,11 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     state, action, next_state, reward = ( self.transitions[-1][0], self.transitions[-1][1], self.transitions[-1][2], self.transitions[-1][3],)
 
     action_idx = ACTION_INDEX[action]
-    self.logger.debug(f"Action-ID: {action_idx}")
+    # self.logger.debug(f"Action-ID: {action_idx}")
 
     self.episode_gathered_rewards += reward
     self.Q_table[state, action_idx] = self.Q_table[state, action_idx] + self.learning_rate * (reward + self.discount_rate * np.max(self.Q_table[next_state]) - self.Q_table[state, action_idx])
-    self.logger.debug(f"Classic_1 Updated Q-table: {self.Q_table}")
+    # self.logger.debug(f"Classic_1 Updated Q-table: {self.Q_table}")
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
@@ -168,19 +168,19 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     self.exploration_rate = self.exploration_rate_end + (
             self.exploration_rate_initial - self.exploration_rate_end) * np.exp(
         -self.exploration_decay_rate * self.episodes)
-    self.logger.debug(f"Exploration_rate{self.episodes}: {self.exploration_rate}")
+    # self.logger.debug(f"Exploration_rate{self.episodes}: {self.exploration_rate}")
 
 
 def reward_from_events(self, events: List[str]) -> int:
     game_rewards = {
-        e.COIN_COLLECTED: 10,
-        e.KILLED_OPPONENT: 1,
+        e.COIN_COLLECTED: 100,
+        e.KILLED_OPPONENT: 100,
         e.BOMB_DROPPED: -1,
         e.BOMB_EXPLODED: 0,
         e.CRATE_DESTROYED: 0,
         e.COIN_FOUND: 0,
-        e.KILLED_SELF: 0,
-        e.GOT_KILLED: 0,
+        e.KILLED_SELF: -100,
+        e.GOT_KILLED: -100,
         e.OPPONENT_ELIMINATED: 0,
         e.SURVIVED_ROUND: 0,
         PLACEHOLDER_EVENT: -.1
@@ -189,5 +189,5 @@ def reward_from_events(self, events: List[str]) -> int:
     for event in events:
         if event in game_rewards:
             reward_sum += game_rewards[event]
-    self.logger.debug(f"Awarded {reward_sum} for events {', '.join(events)}")
+    # self.logger.debug(f"Awarded {reward_sum} for events {', '.join(events)}")
     return reward_sum

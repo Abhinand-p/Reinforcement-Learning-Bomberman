@@ -12,7 +12,7 @@ def setup(self):
     if self.train or not os.path.isfile(os.path.join(q_table_folder, "q_table.npy")):
         self.logger.info("Q-Learning algorithm.")
         self.timestamp = datetime.now().strftime("%dT%H:%M:%S")
-        self.number_of_states = 3
+        self.number_of_states = 4
         self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))
         self.exploration_rate = 0.5
         self.exploration_rate_initial = 0.5
@@ -32,15 +32,14 @@ def act(self, game_state: dict) -> str:
 
     # TODO: Need to check if this is the best way of choosing between exploration and exploitation.
     if np.random.random() < self.exploration_rate:
-        self.logger.info("Exploring")
-        action = np.random.choice(ACTIONS)
-        self.logger.info(f"Action chosen: {action}")
+        # TODO: Is it valid to limit the number of actions to only movements during exploration?
+        action = np.random.choice(ACTIONS[:4])
+        self.logger.info(f"Exploring: {action}")
         return action
 
     else:
-        self.logger.info("Exploiting")
         action = ACTIONS[np.argmax(self.Q_table[state])]
-        self.logger.info(f"Action chosen: {action}")
+        self.logger.info(f"Exploiting: {action}")
         return action
 
 
