@@ -1,0 +1,14 @@
+import events as event
+import settings as setting
+
+AGENT_ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
+TOTAL_NUMBER_OF_ACTIONS = 6
+TOTAL_NUMBER_OF_FEATURE = 12
+
+# mini-batch
+SIZE_OF_BATCH = 512
+MAX_BUFFER_SIZE = 1024
+# models
+SAVE=100
+TOTAL_TRAINING_ROUNDS=5000
+
