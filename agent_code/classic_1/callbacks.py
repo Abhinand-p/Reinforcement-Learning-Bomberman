@@ -66,7 +66,7 @@ def state_to_features(game_state, history) -> np.array:
 
     # Count the number of walls in neighboring tiles
     wall_counter = sum(
-        1 for coord in _get_neighboring_tiles(own_position, 1)
+        1 for coord in _get_neighboring_tiles(own_position, 3)
         if 0 <= coord[0] < game_state["field"].shape[0] and 0 <= coord[1] < game_state["field"].shape[1]
         and game_state["field"][coord] == -1
     )

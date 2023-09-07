@@ -138,8 +138,8 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
         print("First game state is None")
         return
 
-    self.transitions.append( Transition(state_to_features(old_game_state, self.history), self_action, state_to_features(new_game_state, self.history), reward_from_events(self, events), ))
-    state, action, next_state, reward = ( self.transitions[-1][0], self.transitions[-1][1], self.transitions[-1][2], self.transitions[-1][3],)
+    self.transitions.append(Transition(state_to_features(old_game_state, self.history), self_action, state_to_features(new_game_state, self.history), reward_from_events(self, events), ))
+    state, action, next_state, reward = (self.transitions[-1][0], self.transitions[-1][1], self.transitions[-1][2], self.transitions[-1][3],)
 
     action_idx = ACTION_INDEX[action]
     # self.logger.debug(f"Action-ID: {action_idx}")
@@ -173,9 +173,9 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 def reward_from_events(self, events: List[str]) -> int:
     game_rewards = {
-        e.COIN_COLLECTED: 100,
-        e.KILLED_OPPONENT: 100,
-        e.BOMB_DROPPED: -1,
+        e.COIN_COLLECTED: 1,
+        e.KILLED_OPPONENT: 5,
+        e.BOMB_DROPPED: 0,
         e.BOMB_EXPLODED: 0,
         e.CRATE_DESTROYED: 0,
         e.COIN_FOUND: 0,
@@ -183,7 +183,7 @@ def reward_from_events(self, events: List[str]) -> int:
         e.GOT_KILLED: -100,
         e.OPPONENT_ELIMINATED: 0,
         e.SURVIVED_ROUND: 0,
-        PLACEHOLDER_EVENT: -.1
+        PLACEHOLDER_EVENT: -1
     }
     reward_sum = 0
     for event in events:
