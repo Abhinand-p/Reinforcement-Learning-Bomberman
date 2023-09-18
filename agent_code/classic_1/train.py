@@ -1,4 +1,5 @@
 import os
+import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from typing import List
 
@@ -20,8 +21,8 @@ PLACEHOLDER_EVENT = "PLACEHOLDER"
 
 
 def setup_training(self):
-    # Initial exploration rate is set to 1.0
-    self.exploration_rate = 1.0
+    # Initial exploration rate for training
+    self.exploration_rate = self.exploration_rate_initial
     # Alpha = Learning Rate.
     self.learning_rate = 0.7
     # Gamma = Discount Rate.
@@ -47,14 +48,14 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
                                        state_to_features(new_game_state, self.history),
                                        reward_from_events(self, events), ))
     state, action, next_state, reward = (
-    self.transitions[-1][0], self.transitions[-1][1], self.transitions[-1][2], self.transitions[-1][3],)
+        self.transitions[-1][0], self.transitions[-1][1], self.transitions[-1][2], self.transitions[-1][3],)
 
     action_idx = ACTION_INDEX[action]
     # self.logger.debug(f"Action-ID: {action_idx}")
 
     self.episode_gathered_rewards += reward
     self.Q_table[state, action_idx] = self.Q_table[state, action_idx] + self.learning_rate * (
-                reward + self.discount_rate * np.max(self.Q_table[next_state]) - self.Q_table[state, action_idx])
+            reward + self.discount_rate * np.max(self.Q_table[next_state]) - self.Q_table[state, action_idx])
     # self.logger.debug(f"Classic_1 Updated Q-table: {self.Q_table}")
 
 
@@ -100,3 +101,13 @@ def reward_from_events(self, events: List[str]) -> int:
             reward_sum += game_rewards[event]
     # self.logger.debug(f"Awarded {reward_sum} for events {', '.join(events)}")
     return reward_sum
+
+
+def plot_rewards(rewards):
+    episodes = range(1, len(rewards) + 1)
+    plt.plot(episodes, rewards, marker='o')
+    plt.xlabel('Episode')
+    plt.ylabel('Total Rewards')
+    plt.title('Rewards per Episode')
+    plt.grid(True)
+    plt.show()

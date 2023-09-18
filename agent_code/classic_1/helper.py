@@ -20,6 +20,7 @@ def load_latest_q_table(q_table_directory):
 
         q_table = np.load(latest_q_table_path)
         return q_table
+
     except FileNotFoundError:
         print("Q-table directory not found.")
         return None

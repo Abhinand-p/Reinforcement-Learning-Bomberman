@@ -14,9 +14,8 @@ def setup(self):
         self.timestamp = datetime.now().strftime("%dT%H:%M:%S")
         self.number_of_states = 6
         self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))
-        self.exploration_rate = 0.5
-        self.exploration_rate_initial = 0.5
-        self.exploration_rate_end = 0.01
+        self.exploration_rate_initial = 1.0
+        self.exploration_rate_end = 0.1
         self.exploration_decay_rate = 0.01
 
     else:
@@ -30,17 +29,14 @@ def act(self, game_state: dict) -> str:
     # Current game state
     state = state_to_features(game_state, self.history)
 
-    # TODO: Need to check if this is the best way of choosing between exploration and exploitation.
-    if np.random.random() < self.exploration_rate:
-        # TODO: Is it valid to limit the number of actions to only movements during exploration?
-        action = np.random.choice(ACTIONS[:4])
+    if self.train and np.random.random() < self.exploration_rate:
+        action = np.random.choice(ACTIONS)
         self.logger.info(f"Exploring: {action}")
         return action
 
-    else:
-        action = ACTIONS[np.argmax(self.Q_table[state])]
-        self.logger.info(f"Exploiting: {action}")
-        return action
+    action = ACTIONS[np.argmax(self.Q_table[state])]
+    self.logger.info(f"Exploiting: {action}")
+    return action
 
 
 def _get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
@@ -83,6 +79,7 @@ def check_agent_presence(own_position, game_state, radius):
     )
 
 
+# TODO: I think its better to return the direction of the agent as state
 def state_to_features(game_state, history) -> np.array:
     if game_state is None:
         print("First game state is None")
