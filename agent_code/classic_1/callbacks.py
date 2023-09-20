@@ -19,7 +19,7 @@ def setup(self):
     if self.train:
         self.logger.info("Q-Learning algorithm.")
         self.timestamp = datetime.now().strftime("%dT%H:%M:%S")
-        self.number_of_states = 6  # TODO: I think this should be dynamic and not a static number.
+        self.number_of_states = 50  # TODO: I think this should be dynamic and not a static number.
         self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))  # number_of_states * 6
         self.exploration_rate_initial = 1.0
         self.exploration_rate_end = 0.05
@@ -54,7 +54,7 @@ def act(self, game_state: dict) -> str:
     return action
 
 
-def _get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
+def get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
     x, y = own_coord
     # Finding neighbouring tiles
     neighboring_coordinates = []
@@ -108,7 +108,7 @@ def get_neighboring_tiles_within_distance(current_position, max_distance, game_s
 # Feature 1: Count the number of walls in the immediate surrounding tiles within a given radius.
 def count_walls(current_position, game_state, radius):
     return sum(
-        1 for coord in _get_neighboring_tiles(current_position, radius)
+        1 for coord in get_neighboring_tiles(current_position, radius)
         if 0 <= coord[0] < game_state["field"].shape[0] and 0 <= coord[1] < game_state["field"].shape[1]
         and game_state["field"][coord] == -1
     )
@@ -117,7 +117,7 @@ def count_walls(current_position, game_state, radius):
 # Feature 2: Check for bomb presence in the immediate surrounding tiles within a given radius.
 def check_bomb_presence(current_position, game_state, radius):
     return any(
-        bomb[0] in _get_neighboring_tiles(current_position, radius)
+        bomb[0] in get_neighboring_tiles(current_position, radius)
         and bomb[1] != 0
         for bomb in game_state["bombs"]
     )
@@ -126,7 +126,7 @@ def check_bomb_presence(current_position, game_state, radius):
 # Feature 3: Check for agent presence in the immediate surrounding tiles within a given radius.
 def check_agent_presence(current_position, game_state, radius):
     return any(
-        agent[3] in _get_neighboring_tiles(current_position, radius)
+        agent[3] in get_neighboring_tiles(current_position, radius)
         for agent in game_state["others"]
     )
 
@@ -156,15 +156,35 @@ def calculate_death_tile_feature(game_state, own_position) -> int:
         return 0
 
 
+# Feature 5: Checking for movable tiles
+def compute_blockage_features(game_state, agent_position):
+    directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # UP, RIGHT, DOWN, LEFT
+    features = [0] * len(directions)
+
+    for i, direction in enumerate(directions):
+        x, y = agent_position[0] + direction[0], agent_position[1] + direction[1]
+
+        # Check if the neighboring tile is within the game field
+        if 0 <= x < len(game_state["field"]) and 0 <= y < len(game_state["field"][0]):
+            content = game_state["field"][x][y]
+
+            # Check for blockages (e.g., crates, walls, enemies)
+            if content != 0:
+                features[i] = 1
+
+    return features
+
+
 # TODO: I think its better to return the direction of the agent as state
 def state_to_features(self, game_state, history) -> np.array:
     if game_state is None:
         print("First game state is None")
-        return np.zeros(2)
-    else:
-        current_position = game_state["self"][-1]
+        return np.zeros(5)
 
-    features = np.zeros(1, dtype=np.int8)
+    current_position = game_state["self"][-1]
+    enemy_positions = [enemy[-1] for enemy in game_state["others"]]
+
+    features = np.zeros(6, dtype=np.int8)
 
     # Calculate features
     # wall_counter = count_walls(current_position, game_state, 3)
@@ -172,6 +192,10 @@ def state_to_features(self, game_state, history) -> np.array:
     # agent_present = check_agent_presence(current_position, game_state, 3)
     death_tile = calculate_death_tile_feature(game_state, current_position)
     features[0] = death_tile
+
+    blockage_features = compute_blockage_features(game_state, current_position)
+    features[1:5] = blockage_features
+
     # Calculate feature_id based on features
     # features = np.array([int(wall_counter > 2), int(bomb_present), int(agent_present), int(death_tile)])
     # feature_id = 2 * features[0] + features[1] + 2 * features[2] + features[3]

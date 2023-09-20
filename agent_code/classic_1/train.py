@@ -24,6 +24,11 @@ COIN_DISTANCE_FAR = "COIN_DISTANCE_FAR"
 CRATE_DISTANCE_NEAR = "CRATE_DISTANCE_NEAR"
 CRATE_DISTANCE_FAR = "CRATE_DISTANCE_FAR"
 
+# Custom Event: 3 -> Bomb location event
+BOMB_DISTANCE_NEAR = "BOMB_DISTANCE_NEAR"
+BOMB_DISTANCE_FAR = "BOMB_DISTANCE_FAR"
+
+
 # TODO: Add more events like this to handle bomb state(to avoid killing itself), Enemies distance(to play safe) ...
 
 PLACEHOLDER_EVENT = "PLACEHOLDER"
