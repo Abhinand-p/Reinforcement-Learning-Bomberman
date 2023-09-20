@@ -17,6 +17,16 @@ TRANSITION_HISTORY_SIZE = 3
 RECORD_ENEMY_TRANSITIONS = 1.0
 
 # Events
+# Custom Event: 1 -> Coin Collection event
+COIN_DISTANCE_NEAR = "COIN_DISTANCE_NEAR"
+COIN_DISTANCE_FAR = "COIN_DISTANCE_FAR"
+
+# Custom Event: 2 -> Crate explosion event
+CRATE_DISTANCE_NEAR = "CRATE_DISTANCE_NEAR"
+CRATE_DISTANCE_FAR = "CRATE_DISTANCE_FAR"
+
+# TODO: Add more events like this to handle bomb state(to avoid killing itself), Enemies distance(to play safe) ...
+
 PLACEHOLDER_EVENT = "PLACEHOLDER"
 
 
@@ -24,9 +34,9 @@ def setup_training(self):
     # Initial exploration rate for training
     self.exploration_rate = self.exploration_rate_initial
     # Alpha = Learning Rate.
-    self.learning_rate = 0.7
+    self.learning_rate = 0.1
     # Gamma = Discount Rate.
-    self.discount_rate = 0.2
+    self.discount_rate = 0.99
     # episode number
     self.episodes = 0.0
     # Gathered return of rewards per episode
@@ -47,22 +57,32 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     self.transitions.append(Transition(state_to_features(old_game_state, self.history), self_action,
                                        state_to_features(new_game_state, self.history),
                                        reward_from_events(self, events), ))
+
     state, action, next_state, reward = (
         self.transitions[-1][0], self.transitions[-1][1], self.transitions[-1][2], self.transitions[-1][3],)
 
     action_idx = ACTION_INDEX[action]
-    # self.logger.debug(f"Action-ID: {action_idx}")
+    self.logger.debug(f"Action: {action}, Action Index: {action_idx}")
+    self.logger.debug(f"Old Q-value for state {state}: {self.Q_table[state, action_idx]}")
 
     self.episode_gathered_rewards += reward
-    self.Q_table[state, action_idx] = self.Q_table[state, action_idx] + self.learning_rate * (
+
+    new_q_value = self.Q_table[state, action_idx] + self.learning_rate * (
             reward + self.discount_rate * np.max(self.Q_table[next_state]) - self.Q_table[state, action_idx])
-    # self.logger.debug(f"Classic_1 Updated Q-table: {self.Q_table}")
+
+    self.Q_table[state, action_idx] = new_q_value
+
+    self.logger.debug(f"Updated Q-value for state {state} and action {action}: {new_q_value}")
+
+    self.logger.debug(f"Classic_1 Updated Q-table: {self.Q_table}")
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
     self.transitions.append(Transition(state_to_features(last_game_state, self.history), last_action, None,
                                        reward_from_events(self, events), ))
+
     self.episode_gathered_rewards += self.transitions[-1][3]
+
     self.logger.debug(f"Total rewards in episode {self.episodes}: {self.episode_gathered_rewards}")
 
     # Reset the gathered rewards to 0 after each episode
@@ -75,6 +95,8 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         np.save(q_table_file, self.Q_table)
 
     self.episodes += 1
+
+    # Performing exploration rate decay
     self.exploration_rate = self.exploration_rate_end + (
             self.exploration_rate_initial - self.exploration_rate_end) * np.exp(
         -self.exploration_decay_rate * self.episodes)
@@ -83,14 +105,14 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 def reward_from_events(self, events: List[str]) -> int:
     game_rewards = {
-        e.COIN_COLLECTED: 1,
-        e.KILLED_OPPONENT: 5,
-        e.BOMB_DROPPED: 0,
+        e.COIN_COLLECTED: 10,
+        e.KILLED_OPPONENT: 50,
+        e.BOMB_DROPPED: 4,
         e.BOMB_EXPLODED: 0,
-        e.CRATE_DESTROYED: 0,
+        e.CRATE_DESTROYED: 7,
         e.COIN_FOUND: 0,
-        e.KILLED_SELF: -100,
-        e.GOT_KILLED: -100,
+        e.KILLED_SELF: -5,
+        e.GOT_KILLED: 0,
         e.OPPONENT_ELIMINATED: 0,
         e.SURVIVED_ROUND: 0,
         PLACEHOLDER_EVENT: -1

@@ -12,8 +12,8 @@ def setup(self):
     if self.train or not os.path.isfile(os.path.join(q_table_folder, "q_table.npy")):
         self.logger.info("Q-Learning algorithm.")
         self.timestamp = datetime.now().strftime("%dT%H:%M:%S")
-        self.number_of_states = 6
-        self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))
+        self.number_of_states = 6  # TODO: I think this should be dynamic and not a static number.
+        self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))  # number_of_states * 6
         self.exploration_rate_initial = 1.0
         self.exploration_rate_end = 0.1
         self.exploration_decay_rate = 0.01
@@ -22,18 +22,20 @@ def setup(self):
         self.logger.info("Loading from the latest Q_table")
         with open("my-saved-model.pt", "rb") as file:
             self.Q_table = np.load("Q_table.npy")
-    self.history = [0, None]
+
+    self.history = [0, None]  # Currently holding (number of coins collected, tiles visited)
 
 
 def act(self, game_state: dict) -> str:
-    # Current game state
     state = state_to_features(game_state, self.history)
 
     if self.train and np.random.random() < self.exploration_rate:
+        # TODO: Check if during exploring random choice is the best option because we do not want self explosions.
         action = np.random.choice(ACTIONS)
         self.logger.info(f"Exploring: {action}")
         return action
 
+    # TODO: Check if we have to use only exploration from q table after training
     action = ACTIONS[np.argmax(self.Q_table[state])]
     self.logger.info(f"Exploiting: {action}")
     return action
@@ -54,27 +56,27 @@ def _get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
 
 
 # Feature 1: Count the number of walls in the immediate surrounding tiles within a given radius.
-def count_walls(own_position, game_state, radius):
+def count_walls(current_position, game_state, radius):
     return sum(
-        1 for coord in _get_neighboring_tiles(own_position, radius)
+        1 for coord in _get_neighboring_tiles(current_position, radius)
         if 0 <= coord[0] < game_state["field"].shape[0] and 0 <= coord[1] < game_state["field"].shape[1]
         and game_state["field"][coord] == -1
     )
 
 
 # Feature 2: Check for bomb presence in the immediate surrounding tiles within a given radius.
-def check_bomb_presence(own_position, game_state, radius):
+def check_bomb_presence(current_position, game_state, radius):
     return any(
-        bomb[0] in _get_neighboring_tiles(own_position, radius)
+        bomb[0] in _get_neighboring_tiles(current_position, radius)
         and bomb[1] != 0
         for bomb in game_state["bombs"]
     )
 
 
 # Feature 3: Check for agent presence in the immediate surrounding tiles within a given radius.
-def check_agent_presence(own_position, game_state, radius):
+def check_agent_presence(current_position, game_state, radius):
     return any(
-        agent[3] in _get_neighboring_tiles(own_position, radius)
+        agent[3] in _get_neighboring_tiles(current_position, radius)
         for agent in game_state["others"]
     )
 
@@ -85,12 +87,13 @@ def state_to_features(game_state, history) -> np.array:
         print("First game state is None")
         return np.zeros(2)
 
-    own_position = game_state["self"][-1]
+    # Get the current position
+    current_position = game_state["self"][-1]
 
     # Calculate features
-    wall_counter = count_walls(own_position, game_state, 3)
-    bomb_present = check_bomb_presence(own_position, game_state, 3)
-    agent_present = check_agent_presence(own_position, game_state, 3)
+    wall_counter = count_walls(current_position, game_state, 3)
+    bomb_present = check_bomb_presence(current_position, game_state, 3)
+    agent_present = check_agent_presence(current_position, game_state, 3)
 
     # Calculate feature_id based on features
     features = np.array([int(wall_counter > 2), int(bomb_present), int(agent_present)])
