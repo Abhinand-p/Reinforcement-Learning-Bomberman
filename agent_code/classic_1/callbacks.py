@@ -40,7 +40,7 @@ def set_decay_rate(self) -> float:
 
 
 def act(self, game_state: dict) -> str:
-    state = state_to_features(game_state, self.history)
+    state = state_to_features(self, game_state, self.history)
 
     if self.train and np.random.random() < self.exploration_rate:
         # TODO: Check if during exploring random choice is the best option because we do not want self explosions.
@@ -66,6 +66,43 @@ def _get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
             (x - i, y)  # left in the matrix
         ])
     return neighboring_coordinates
+
+
+def get_neighboring_tiles_within_distance(current_position, max_distance, game_state) -> List[Tuple[int]]:
+    directions = ["top", "right_side", "bottom", "left_side"]
+    current_x, current_y = current_position[0], current_position[1]
+    neighboring_tiles = []
+
+    for d, direction in enumerate(directions):
+        valid_tiles = []
+        for i in range(1, max_distance + 1):
+            try:
+                if direction == "top":
+                    if game_state["field"][current_x][current_y + i] in [0, 1]:
+                        valid_tiles += [(current_x, current_y + i)]
+                    else:
+                        break
+                elif direction == "right_side":
+                    if game_state["field"][current_x + i][current_y] in [0, 1]:
+                        valid_tiles += [(current_x + i, current_y)]
+                    else:
+                        break
+                elif direction == "bottom":
+                    if game_state["field"][current_x][current_y - i] in [0, 1]:
+                        valid_tiles += [(current_x, current_y - i)]
+                    else:
+                        break
+                elif direction == "left_side":
+                    if game_state["field"][current_x - i][current_y] in [0, 1]:
+                        valid_tiles += [(current_x - i, current_y)]
+                    else:
+                        break
+            except IndexError:
+                break
+
+        neighboring_tiles += valid_tiles
+
+    return neighboring_tiles
 
 
 # Feature 1: Count the number of walls in the immediate surrounding tiles within a given radius.
@@ -94,25 +131,53 @@ def check_agent_presence(current_position, game_state, radius):
     )
 
 
+# Feature 4: Getting the number of tiles in each direction of the agent. 0: free tiles and 1:crates
+def calculate_death_tile_feature(game_state, own_position) -> int:
+    all_death_tiles = []
+    is_dangerous = []
+
+    if len(game_state["bombs"]) > 0:
+        for bomb in game_state["bombs"]:
+            bomb_position = bomb[0]
+            neighboring_death_tiles = get_neighboring_tiles_within_distance(
+                bomb_position, 3, game_state=game_state
+            )
+            if neighboring_death_tiles:
+                all_death_tiles += neighboring_death_tiles
+
+        if len(all_death_tiles) > 0:
+            for death_tile in all_death_tiles:
+                in_danger = own_position == death_tile
+                is_dangerous.append(in_danger)
+            # 1 if the agent is on a death tile.
+            # 0 if the agent is not on a death tile.
+            return int(any(is_dangerous))
+    else:
+        return 0
+
+
 # TODO: I think its better to return the direction of the agent as state
-def state_to_features(game_state, history) -> np.array:
+def state_to_features(self, game_state, history) -> np.array:
     if game_state is None:
         print("First game state is None")
         return np.zeros(2)
+    else:
+        current_position = game_state["self"][-1]
 
-    # Get the current position
-    current_position = game_state["self"][-1]
+    features = np.zeros(1, dtype=np.int8)
 
     # Calculate features
-    wall_counter = count_walls(current_position, game_state, 3)
-    bomb_present = check_bomb_presence(current_position, game_state, 3)
-    agent_present = check_agent_presence(current_position, game_state, 3)
-
+    # wall_counter = count_walls(current_position, game_state, 3)
+    # bomb_present = check_bomb_presence(current_position, game_state, 3)
+    # agent_present = check_agent_presence(current_position, game_state, 3)
+    death_tile = calculate_death_tile_feature(game_state, current_position)
+    features[0] = death_tile
     # Calculate feature_id based on features
-    features = np.array([int(wall_counter > 2), int(bomb_present), int(agent_present)])
-    feature_id = 2 * features[0] + features[1] + 2 * features[2]
+    # features = np.array([int(wall_counter > 2), int(bomb_present), int(agent_present), int(death_tile)])
+    # feature_id = 2 * features[0] + features[1] + 2 * features[2] + features[3]
 
-    return feature_id
+    self.logger.info(f"Feature vector: {features}")
+    return features
 
 
 def load_latest_q_table(self, q_table_directory):

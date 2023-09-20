@@ -53,8 +53,8 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
         print("First game state is None")
         return
 
-    self.transitions.append(Transition(state_to_features(old_game_state, self.history), self_action,
-                                       state_to_features(new_game_state, self.history),
+    self.transitions.append(Transition(state_to_features(self,old_game_state, self.history), self_action,
+                                       state_to_features(self,new_game_state, self.history),
                                        reward_from_events(self, events), ))
 
     state, action, next_state, reward = (
@@ -77,7 +77,7 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
-    self.transitions.append(Transition(state_to_features(last_game_state, self.history), last_action, None,
+    self.transitions.append(Transition(state_to_features(self,last_game_state, self.history), last_action, None,
                                        reward_from_events(self, events), ))
 
     self.episode_gathered_rewards += self.transitions[-1][3]
@@ -89,7 +89,7 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
     # TODO: Should I update the same Q-table instead of new one everytime?
     q_table_folder = "Q_tables/"
-    if self.episodes % 100 == 0:
+    if self.episodes % 250 == 0:
         q_table_file = os.path.join(q_table_folder, f"Q_table-{self.timestamp}")
         np.save(q_table_file, self.Q_table)
 
@@ -104,20 +104,20 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 def reward_from_events(self, events: List[str]) -> int:
     game_rewards = {
-        e.COIN_COLLECTED: 10,
-        e.KILLED_OPPONENT: 50,
-        e.BOMB_DROPPED: 4,
-        e.BOMB_EXPLODED: 0,
-        e.CRATE_DESTROYED: 7,
-        e.COIN_FOUND: 0,
-        e.KILLED_SELF: 1,
-        e.GOT_KILLED: 1,
-        e.OPPONENT_ELIMINATED: 0,
-        e.SURVIVED_ROUND: 2,
-        e.MOVED_LEFT: 3,
-        e.MOVED_RIGHT: 3,
-        e.MOVED_UP: 3,
-        e.MOVED_DOWN: 3,
+        e.COIN_COLLECTED: 50,
+        e.KILLED_OPPONENT: 200,
+        e.BOMB_DROPPED: 5,
+        # e.BOMB_EXPLODED: 0,
+        e.CRATE_DESTROYED: 5,
+        # e.COIN_FOUND: 0,
+        e.KILLED_SELF: -10,
+        e.GOT_KILLED: -50,
+        e.OPPONENT_ELIMINATED: 0.5,
+        # e.SURVIVED_ROUND: 0,
+        # e.MOVED_LEFT: 3,
+        # e.MOVED_RIGHT: 3,
+        # e.MOVED_UP: 3,
+        # e.MOVED_DOWN: 3,
         e.INVALID_ACTION: -1,
         PLACEHOLDER_EVENT: -1
 
