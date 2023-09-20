@@ -19,7 +19,7 @@ def setup(self):
     if self.train:
         self.logger.info("Q-Learning algorithm.")
         self.timestamp = datetime.now().strftime("%dT%H:%M:%S")
-        self.number_of_states = 50  # TODO: I think this should be dynamic and not a static number.
+        self.number_of_states = 10  # TODO: I think this should be dynamic and not a static number.
         self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))  # number_of_states * 6
         self.exploration_rate_initial = 1.0
         self.exploration_rate_end = 0.05
@@ -48,9 +48,13 @@ def act(self, game_state: dict) -> str:
         self.logger.info(f"Exploring: {action}")
         return action
 
-    # TODO: Check if we have to use only exploration from q table after training
-    action = ACTIONS[np.argmax(self.Q_table[state])]
-    self.logger.info(f"Exploiting: {action}")
+    if not np.any(self.Q_table[state]):
+        action = np.random.choice(ACTIONS)
+        self.logger.info(f"Q-Table has no zeros, so random action chosen:{action}")
+    else:
+        action = ACTIONS[np.argmax(self.Q_table[state])]
+        self.logger.info(f"Exploiting: {action}")
+
     return action
 
 
@@ -60,10 +64,10 @@ def get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
     neighboring_coordinates = []
     for i in range(1, radius + 1):
         neighboring_coordinates.extend([
-            (x, y + i),  # down in the matrix
-            (x, y - i),  # up in the matrix
-            (x + i, y),  # right in the matrix
-            (x - i, y)  # left in the matrix
+            (x, y + i),  # down
+            (x, y - i),  # up
+            (x + i, y),  # right
+            (x - i, y)  # left
         ])
     return neighboring_coordinates
 
@@ -132,7 +136,7 @@ def check_agent_presence(current_position, game_state, radius):
 
 
 # Feature 4: Getting the number of tiles in each direction of the agent. 0: free tiles and 1:crates
-def calculate_death_tile_feature(game_state, own_position) -> int:
+def calculate_death_tile(game_state, own_position) -> int:
     all_death_tiles = []
     is_dangerous = []
 
@@ -157,7 +161,7 @@ def calculate_death_tile_feature(game_state, own_position) -> int:
 
 
 # Feature 5: Checking for movable tiles
-def compute_blockage_features(game_state, agent_position):
+def compute_blockage(game_state, agent_position):
     directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # UP, RIGHT, DOWN, LEFT
     features = [0] * len(directions)
 
@@ -175,6 +179,19 @@ def compute_blockage_features(game_state, agent_position):
     return features
 
 
+# Feature 6: Checking for new tile
+def calculate_going_to_new_tiles(history):
+    num_visited_tiles = len(history[1])
+    if num_visited_tiles > 1:
+        num_unique_visited_tiles = len(set(history[1]))
+        # unique tiles visited to the total tiles visited ratio
+        feature_value = 1 if np.floor((num_unique_visited_tiles / num_visited_tiles)) > 0.6 else 0
+    else:
+        feature_value = 0
+
+    return feature_value
+
+
 # TODO: I think its better to return the direction of the agent as state
 def state_to_features(self, game_state, history) -> np.array:
     if game_state is None:
@@ -184,17 +201,20 @@ def state_to_features(self, game_state, history) -> np.array:
     current_position = game_state["self"][-1]
     enemy_positions = [enemy[-1] for enemy in game_state["others"]]
 
-    features = np.zeros(6, dtype=np.int8)
+    features = np.zeros(10, dtype=np.int8)
 
     # Calculate features
     # wall_counter = count_walls(current_position, game_state, 3)
     # bomb_present = check_bomb_presence(current_position, game_state, 3)
     # agent_present = check_agent_presence(current_position, game_state, 3)
-    death_tile = calculate_death_tile_feature(game_state, current_position)
+    death_tile = calculate_death_tile(game_state, current_position)
     features[0] = death_tile
 
-    blockage_features = compute_blockage_features(game_state, current_position)
+    blockage_features = compute_blockage(game_state, current_position)
     features[1:5] = blockage_features
+
+    visited_ratio = calculate_going_to_new_tiles(self.history)
+    features[5] = visited_ratio
 
     # Calculate feature_id based on features
     # features = np.array([int(wall_counter > 2), int(bomb_present), int(agent_present), int(death_tile)])
