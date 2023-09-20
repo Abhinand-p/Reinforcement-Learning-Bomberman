@@ -9,19 +9,19 @@ ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 def setup(self):
     q_table_folder = "Q_tables/"
 
-    if self.train or not os.path.isfile(os.path.join(q_table_folder, "q_table.npy")):
+    if self.train:
         self.logger.info("Q-Learning algorithm.")
         self.timestamp = datetime.now().strftime("%dT%H:%M:%S")
         self.number_of_states = 6  # TODO: I think this should be dynamic and not a static number.
         self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))  # number_of_states * 6
-        self.exploration_rate_initial = 1.0
-        self.exploration_rate_end = 0.1
+        self.exploration_rate_initial = 0.5
+        self.exploration_rate_end = 0.05
         self.exploration_decay_rate = 0.01
 
     else:
         self.logger.info("Loading from the latest Q_table")
-        with open("my-saved-model.pt", "rb") as file:
-            self.Q_table = np.load("Q_table.npy")
+        q_table_directory_path = "Q_tables"
+        self.Q_table = load_latest_q_table(self, q_table_directory_path)
 
     self.history = [0, None]  # Currently holding (number of coins collected, tiles visited)
 
@@ -100,3 +100,26 @@ def state_to_features(game_state, history) -> np.array:
     feature_id = 2 * features[0] + features[1] + 2 * features[2]
 
     return feature_id
+
+
+def load_latest_q_table(self, q_table_directory):
+    try:
+        files = os.listdir(q_table_directory)
+        q_table_files = [file for file in files if file.startswith("Q_table-")]
+
+        if not q_table_files:
+            self.logger.info("No Q-table files found in the directory.")
+            return None
+
+        # Finding the latest Q-table file based on the timestamp
+        latest_q_table_file = max(q_table_files)
+        latest_q_table_path = os.path.join(q_table_directory, latest_q_table_file)
+
+        q_table = np.load(latest_q_table_path)
+
+        self.logger.info(f"Q-table file loaded:{latest_q_table_path}")
+        return q_table
+
+    except FileNotFoundError:
+        self.logger.info("Q-table directory not found.")
+        return None

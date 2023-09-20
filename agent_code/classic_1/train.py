@@ -72,9 +72,9 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
     self.Q_table[state, action_idx] = new_q_value
 
-    self.logger.debug(f"Updated Q-value for state {state} and action {action}: {new_q_value}")
+    # self.logger.debug(f"Updated Q-value for state {state} and action {action}: {new_q_value}")
 
-    self.logger.debug(f"Classic_1 Updated Q-table: {self.Q_table}")
+    # self.logger.debug(f"Classic_1 Updated Q-table: {self.Q_table}")
 
 
 def end_of_round(self, last_game_state: dict, last_action: str, events: List[str]):
@@ -111,11 +111,17 @@ def reward_from_events(self, events: List[str]) -> int:
         e.BOMB_EXPLODED: 0,
         e.CRATE_DESTROYED: 7,
         e.COIN_FOUND: 0,
-        e.KILLED_SELF: -5,
-        e.GOT_KILLED: 0,
+        e.KILLED_SELF: 1,
+        e.GOT_KILLED: 1,
         e.OPPONENT_ELIMINATED: 0,
-        e.SURVIVED_ROUND: 0,
+        e.SURVIVED_ROUND: 2,
+        e.MOVED_LEFT: 3,
+        e.MOVED_RIGHT: 3,
+        e.MOVED_UP: 3,
+        e.MOVED_DOWN: 3,
+        e.INVALID_ACTION: -1,
         PLACEHOLDER_EVENT: -1
+
     }
     reward_sum = 0
     for event in events:
