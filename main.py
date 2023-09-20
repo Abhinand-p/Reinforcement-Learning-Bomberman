@@ -157,10 +157,10 @@ def main(argv = None):
         if args.train == 0 and not args.continue_without_training:
             args.continue_without_training = True
         if args.my_agent:
-            agents.append((args.my_agent, len(agents) < args.train))
+            agents.append((args.my_agent, len(agents) < args.train, args.n_rounds))
             args.agents = ["rule_based_agent"] * (s.MAX_AGENTS - 1)
         for agent_name in args.agents:
-            agents.append((agent_name, len(agents) < args.train))
+            agents.append((agent_name, len(agents) < args.train, args.n_rounds))
 
         world = BombeRLeWorld(args, agents)
         every_step = not args.skip_frames

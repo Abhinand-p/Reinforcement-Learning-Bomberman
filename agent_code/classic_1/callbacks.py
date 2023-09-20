@@ -1,29 +1,42 @@
 import os
 import numpy as np
+import math
 from datetime import datetime
 from typing import Tuple, List
+from collections import deque
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
+ACTIONS_IDEAS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
 
 
 def setup(self):
     q_table_folder = "Q_tables/"
+    self.history = [0, deque(maxlen=5)]  # Currently holding (number of coins collected, tiles visited)
+    self.new_state = None
+    self.old_distance = 0
+    self.new_distance = 0
 
     if self.train:
         self.logger.info("Q-Learning algorithm.")
         self.timestamp = datetime.now().strftime("%dT%H:%M:%S")
         self.number_of_states = 6  # TODO: I think this should be dynamic and not a static number.
         self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))  # number_of_states * 6
-        self.exploration_rate_initial = 0.5
+        self.exploration_rate_initial = 1.0
         self.exploration_rate_end = 0.05
-        self.exploration_decay_rate = 0.01
+        self.exploration_decay_rate = set_decay_rate(self)
 
     else:
         self.logger.info("Loading from the latest Q_table")
         q_table_directory_path = "Q_tables"
         self.Q_table = load_latest_q_table(self, q_table_directory_path)
 
-    self.history = [0, None]  # Currently holding (number of coins collected, tiles visited)
+
+def set_decay_rate(self) -> float:
+    # This method utilizes the n_rounds to set the decay rate
+    decay_rate = -math.log((self.exploration_rate_end + 0.005) / self.exploration_rate_initial) / self.n_rounds
+    self.logger.info(f" n_rounds: {self.n_rounds}")
+    self.logger.info(f"Determined exploration decay rate: {decay_rate}")
+    return decay_rate
 
 
 def act(self, game_state: dict) -> str:

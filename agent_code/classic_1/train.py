@@ -1,5 +1,4 @@
 import os
-import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from typing import List
 
@@ -130,12 +129,3 @@ def reward_from_events(self, events: List[str]) -> int:
     # self.logger.debug(f"Awarded {reward_sum} for events {', '.join(events)}")
     return reward_sum
 
-
-def plot_rewards(rewards):
-    episodes = range(1, len(rewards) + 1)
-    plt.plot(episodes, rewards, marker='o')
-    plt.xlabel('Episode')
-    plt.ylabel('Total Rewards')
-    plt.title('Rewards per Episode')
-    plt.grid(True)
-    plt.show()
