@@ -13,6 +13,7 @@ ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTIONS_IDEAS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
 n_rows = 17
 n_cols = 17
+bomb_power = 4
 
 
 def setup(self):
@@ -59,15 +60,15 @@ def act(self, game_state: dict) -> str:
     if self.train and np.random.random() < self.exploration_rate:
         # TODO: Check if during exploring random choice is the best option because we do not want self explosions.
         action = np.random.choice(ACTIONS)
-        self.logger.info(f"Exploring: {action}")
+        self.logger.info(f"act: Exploring: {action}")
         return action
 
     if not np.any(self.Q_table[state]):
         action = np.random.choice(ACTIONS)
-        self.logger.info(f"Q-Table has all zeros, so random action chosen: {action}")
+        self.logger.info(f"act: Q-Table has all zeros, so random action chosen: {action}")
     else:
         action = ACTIONS[np.argmax(self.Q_table[state])]
-        self.logger.info(f"Exploiting: {action}")
+        self.logger.info(f"act: Exploiting: {action}")
     return action
 
 
@@ -248,7 +249,7 @@ def calculate_death_tile(game_state, own_position) -> int:
         return 0
 
 
-# Feature 5: Checking for movable tiles
+# Feature 5: Checking for movable tiles based on other agents, bombs, explosions
 def compute_blockage(game_state: dict) -> List[str]:
     # Get current position
     current_position = game_state["self"][-1]
@@ -280,18 +281,60 @@ def compute_blockage(game_state: dict) -> List[str]:
 
 
 # Feature 6: Checking for new tile
-def calculate_going_to_new_tiles(history):
-    num_visited_tiles = len(history[1])
-    if num_visited_tiles > 1:
-        num_unique_visited_tiles = len(set(history[1]))
-        # unique tiles visited to the total tiles visited ratio
-        feature_value = 1 if np.floor((num_unique_visited_tiles / num_visited_tiles)) > 0.6 else 0
-    else:
-        feature_value = 0
+def calculate_going_to_new_tiles(self, game_state) -> str:
+    # Get current position
+    current_position = game_state["self"][-1]
 
-    return feature_value
+    # Get Bomb positions
+    bombs_positions = [bomb[0] for bomb in game_state["bombs"]]
+
+    # Get adjacent positions
+    adjacent_positions = get_neighboring_tiles_within_distance(current_position, 3, game_state)
+    adjacent_positions.append(current_position)
+
+    # Check for a clear path without bomb explosion risk
+    if not any([adjacent in bombs_positions for adjacent in adjacent_positions]):
+        return "SAFE"
+
+    # Calculate tiles affected by bomb explosions and determine reach
+    exploded_tiles = [current_position]
+
+    # Power of the bomb
+    effect = bomb_power
+    for b in game_state["bombs"]:
+        exploded_tiles += get_neighboring_tiles_within_distance(b[0], 3, game_state)
+        if b[1] + 1 < effect:
+            effect = b[1] + 1
+
+    graph = calculate_adjacency_matrix(self, game_state)
+    adjacent_positions = get_neighboring_tiles(current_position, effect)
+
+    shortest_path = None
+    shortest_distance = float("inf")
+
+    # Find the shortest safe path to a reachable tile
+    for adjacent in adjacent_positions:
+        if adjacent not in graph or adjacent in exploded_tiles:
+            continue
+        try:
+            current_shortest_path, current_shortest_distance = find_shortest_path_coordinates(graph, current_position,
+                                                                                              adjacent)
+            if current_shortest_distance < shortest_distance:
+                shortest_path = current_shortest_path
+                shortest_distance = current_shortest_distance
+
+        except nx.exception.NetworkXNoPath:
+            continue
+
+    if not shortest_path:
+        random_choice = np.random.choice(ACTIONS_IDEAS)
+        self.logger.info(f"calculate_going_to_new_tiles: No shortest path {random_choice}")
+        return random_choice
+
+    return select_best_action(self, current_position, shortest_path)
 
 
+# Feature 7: Calculating the direction to coin/crate
 def shortest_path_to_coin_or_crate(agent, game_state):
     graph = calculate_adjacency_matrix(agent, game_state)
     graph_with_crates = calculate_adjacency_matrix(agent, game_state, consider_crates=False)
@@ -431,18 +474,32 @@ def shortest_path_to_coin_or_crate(agent, game_state):
 
 
 def state_to_features(self, game_state) -> np.array:
-    if game_state is None:
-        self.logger.info(f"state_to_features: First Game")
     features_dict = {}
 
-    # Feature 1:
     coin_direction = shortest_path_to_coin_or_crate(self, game_state)
     if coin_direction in ["DOWN", "UP", "RIGHT", "LEFT"]:
         features_dict["Direction_coin/crate"] = coin_direction
         # self.logger.info(f"state_to_features: Feature 1:{coin_direction}")
     else:
-        self.logger.info(f"state_to_features: Feature 1: Invalid direction")
-    (features_dict["Up"], features_dict["Right"], features_dict["Down"], features_dict["Left"]) = compute_blockage(game_state)
+        # TODO: Check why for some it is still none
+        self.logger.info(f"state_to_features: shortest_path_to_coin_or_crate: Invalid direction:{coin_direction}")
+        random_choice = np.random.choice(ACTIONS_IDEAS)
+        self.logger.info(f"state_to_features: shortest_path_to_coin_or_crate: Invalid direction: {random_choice}")
+        features_dict["Direction_coin/crate"] = random_choice
+
+    bomb_safety_result = calculate_going_to_new_tiles(self, game_state)
+
+    if bomb_safety_result in ["DOWN", "UP", "RIGHT", "LEFT", "SAFE"]:
+        features_dict["Direction_bomb"] = bomb_safety_result
+    else:
+        # TODO: Check why for some it is still none
+        self.logger.info(f"state_to_features: calculate_going_to_new_tiles: Invalid direction: {bomb_safety_result}")
+        random_choice = np.random.choice(ACTIONS_IDEAS)
+        self.logger.info(f"state_to_features: calculate_going_to_new_tiles: Invalid direction:  {random_choice}")
+        features_dict["Direction_bomb"] = random_choice
+
+    (features_dict["Up"], features_dict["Right"], features_dict["Down"], features_dict["Left"]) = compute_blockage(
+        game_state)
 
     # features = np.zeros(10, dtype=np.int8)
     # Calculate features
