@@ -138,6 +138,7 @@ def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
     # self.logger.info(f"Blockers matrix: {blockers}")
 
     graph = Graph()
+
     # format: vertex1--vertex2
     # --: indicates an edge
     for i in range(n_rows):
@@ -156,6 +157,33 @@ def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
     # Removing nodes that represent blockers
     graph.delete_vertices([i * n_cols + j for i, j in blockers])
     return graph
+
+
+# A helper function to get the shortest path between two coordinates.
+def find_shortest_path_coordinates(graph, start_coordinate, end_coordinate):
+    start_vertex = graph.vs.find(name=str(start_coordinate[0] * n_cols + start_coordinate[1]))
+    shortest_path_nodes = \
+        graph.get_shortest_paths(start_vertex, to=str(end_coordinate[0] * n_cols + end_coordinate[1]), mode="OUT")[0]
+    shortest_path_coordinates = [(int(node) // n_cols, int(node) % n_cols) for node in shortest_path_nodes]
+    return shortest_path_coordinates[1:], len(shortest_path_nodes) - 1
+
+
+# A helper function to select the best action given the current position
+def select_best_action(current_coord, next_coord):
+    x_diff = next_coord[0] - current_coord[0]
+    y_diff = next_coord[1] - current_coord[1]
+
+    # ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT']
+    if x_diff == 1:
+        return 2  # RIGHT
+    elif x_diff == -1:
+        return 4  # LEFT
+    elif y_diff == 1:
+        return 1  # UP
+    elif y_diff == -1:
+        return 3  # DOWN
+    else:
+        return 4  # WAIT
 
 
 # Feature 1: Count the number of walls in the immediate surrounding tiles within a given radius.
@@ -241,7 +269,8 @@ def calculate_going_to_new_tiles(history):
     return feature_value
 
 
-# TODO: I think its better to return the direction of the agent as state
+# TODO: I should make a feature dictionary and return the action list. Then I will have a better contol to check the
+#  training process
 def state_to_features(self, game_state, history) -> np.array:
     if game_state is None:
         print("First game state is None")
