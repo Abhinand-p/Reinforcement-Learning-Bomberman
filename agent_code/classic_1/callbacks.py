@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import math
+import networkx as nx
 
 from datetime import datetime
 from typing import Tuple, List
@@ -137,53 +138,39 @@ def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
 
     # self.logger.info(f"Blockers matrix: {blockers}")
 
-    graph = Graph()
-
-    # format: vertex1--vertex2
-    # --: indicates an edge
-    for i in range(n_rows):
-        for j in range(n_cols):
-            vertex_id = i * n_cols + j
-            graph.add_vertex(vertex_id)
-
-    for i in range(n_rows):
-        for j in range(n_cols):
-            vertex_id = i * n_cols + j
-            if j < n_cols - 1:
-                graph.add_edge(vertex_id, vertex_id + 1)
-            if i < n_rows - 1:
-                graph.add_edge(vertex_id, vertex_id + n_cols)
+    graph = nx.grid_2d_graph(m=n_cols, n=n_rows)
 
     # Removing nodes that represent blockers
-    graph.delete_vertices([i * n_cols + j for i, j in blockers])
+    graph.remove_nodes_from(blockers)
     return graph
 
 
 # A helper function to get the shortest path between two coordinates.
-def find_shortest_path_coordinates(graph, start_coordinate, end_coordinate):
-    start_vertex = graph.vs.find(name=str(start_coordinate[0] * n_cols + start_coordinate[1]))
-    shortest_path_nodes = \
-        graph.get_shortest_paths(start_vertex, to=str(end_coordinate[0] * n_cols + end_coordinate[1]), mode="OUT")[0]
-    shortest_path_coordinates = [(int(node) // n_cols, int(node) % n_cols) for node in shortest_path_nodes]
-    return shortest_path_coordinates[1:], len(shortest_path_nodes) - 1
+def find_shortest_path_coordinates(graph, a, b) -> Tuple[Graph, int]:
+    try:
+        shortest_path = nx.shortest_path(graph, source=a, target=b, weight=None, method="dijkstra")
+    except nx.exception.NodeNotFound as e:
+        print(graph.nodes)
+        raise e
+
+    shortest_path_length = len(shortest_path) - 1  # because path considers self as part of the path
+    return shortest_path, shortest_path_length
 
 
 # A helper function to select the best action given the current position
-def select_best_action(current_coord, next_coord):
+def select_best_action(self, current_coord, next_coord):
     x_diff = next_coord[0] - current_coord[0]
     y_diff = next_coord[1] - current_coord[1]
 
     # ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT']
     if x_diff == 1:
-        return 2  # RIGHT
+        return "RIGHT"  # RIGHT
     elif x_diff == -1:
-        return 4  # LEFT
+        return "LEFT"  # LEFT
     elif y_diff == 1:
-        return 1  # UP
+        return "UP"  # UP
     elif y_diff == -1:
-        return 3  # DOWN
-    else:
-        return 4  # WAIT
+        return "DOWN"  # DOWN
 
 
 # Feature 1: Count the number of walls in the immediate surrounding tiles within a given radius.
@@ -269,6 +256,61 @@ def calculate_going_to_new_tiles(history):
     return feature_value
 
 
+def shortest_path_to_coin_or_crate(agent, game_state):
+    graph_with_crates = calculate_adjacency_matrix(agent, game_state, consider_crates=False)
+
+    # current coordinate Classic_1 agent
+    current_position = game_state["self"][-1]
+    # agent.logger.info(f"shortest_path_to_coin: current_position: {current_position}")
+
+    # Extract explosion area positions.
+    explosion_area = [(index[0], index[1]) for index, field in np.ndenumerate(game_state["explosion_map"]) if
+                      field != 0]
+    # agent.logger.info(f"shortest_path_to_coin: explosion_area: {explosion_area}")
+
+    # Crates present that are not yet exploded.
+    crates = [(index[0], index[1]) for index, field in np.ndenumerate(game_state["field"]) if field == 1]
+    # agent.logger.info(f"shortest_path_to_coin: crates: {crates}")
+
+    # Good Coins are those that are not in the explosion_area
+    good_coins = [coin for coin in game_state["coins"] if coin not in explosion_area]
+    # agent.logger.info(f"shortest_path_to_coin: good_coins: {good_coins}")
+
+    #  If only there are crates but no good_coins
+    if not any(good_coins) and any(crates):
+        next_crate_position = (None, np.inf)
+
+        for crate_coord in crates:
+            current_path, current_path_length = find_shortest_path_coordinates(graph_with_crates, current_position,
+                                                                               crate_coord)
+            if current_path_length == 1:
+                # TODO: Should I modify the code to add an action to bomb here for this case?
+                agent.logger.info(f"shortest_path_to_coin: I am next to a crate")
+                return select_best_action(agent, current_position, current_path[0])
+
+            elif current_path_length < next_crate_position[1]:
+                next_crate_position = (current_path, current_path_length)
+
+        # If there are no crates or coins still then return a random action -> highly unlikely I guess
+        if next_crate_position == (None, np.inf):
+            random_choice = np.random.choice(ACTIONS_IDEAS)
+            agent.logger.info(f"shortest_path_to_coin: no crate or a good coin still: {random_choice}")
+            return random_choice
+
+        return select_best_action(agent, current_position, next_crate_position[0][0])
+
+    # If there are no crates or good coins -> random action
+    elif not any(good_coins) and not any(crates):
+        random_choice = np.random.choice(ACTIONS_IDEAS)
+        agent.logger.info(f"shortest_path_to_coin: no crate or a good coin: {random_choice}")
+        return random_choice
+
+    else:
+        random_choice = np.random.choice(ACTIONS_IDEAS)
+        agent.logger.info(f"shortest_path_to_coin: Last else: {random_choice}")
+        return random_choice
+
+
 # TODO: I should make a feature dictionary and return the action list. Then I will have a better contol to check the
 #  training process
 def state_to_features(self, game_state, history) -> np.array:
@@ -294,6 +336,8 @@ def state_to_features(self, game_state, history) -> np.array:
 
     visited_ratio = calculate_going_to_new_tiles(self.history)
     features[5] = visited_ratio
+
+    direction = shortest_path_to_coin_or_crate(self, game_state)
 
     # Calculate feature_id based on features
     # features = np.array([int(wall_counter > 2), int(bomb_present), int(agent_present), int(death_tile)])
