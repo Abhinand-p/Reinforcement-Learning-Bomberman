@@ -28,6 +28,9 @@ CRATE_DISTANCE_FAR = "CRATE_DISTANCE_FAR"
 BOMB_DISTANCE_NEAR = "BOMB_DISTANCE_NEAR"
 BOMB_DISTANCE_FAR = "BOMB_DISTANCE_FAR"
 
+# Custom Event: 4 -> Blocking the movement
+AGENT_MOVEMENT_BLOCKED = "AGENT_MOVEMENT_BLOCKED"
+
 
 # TODO: Add more events like this to handle bomb state(to avoid killing itself), Enemies distance(to play safe) ...
 
@@ -57,14 +60,23 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     old_state = self.old_state
     self.new_state = state_to_features(self, new_game_state)
     new_state = self.new_state
-    old_feature_dict = self.valid_list[old_state]
+    previous_feature_dict = self.valid_list[old_state]
 
-    if old_feature_dict["Direction_bomb"] != "SAFE":
-        if self_action == old_feature_dict["Direction_bomb"]:
+    if previous_feature_dict["Direction_bomb"] != "SAFE":
+        if self_action == previous_feature_dict["Direction_bomb"]:
             events.append(BOMB_DISTANCE_FAR)
         else:
             events.append(BOMB_DISTANCE_NEAR)
 
+    if previous_feature_dict["Up"] == "BLOCK" and self_action == "UP":
+        events.append(AGENT_MOVEMENT_BLOCKED)
+    elif previous_feature_dict["Down"] == "BLOCK" and self_action == "DOWN":
+        events.append(AGENT_MOVEMENT_BLOCKED)
+    elif previous_feature_dict["Right"] == "BLOCK" and self_action == "RIGHT":
+        events.append(AGENT_MOVEMENT_BLOCKED)
+    elif previous_feature_dict["Left"] == "BLOCK" and self_action == "LEFT":
+        events.append(AGENT_MOVEMENT_BLOCKED)
+    
     reward = reward_from_events(self, events)
     self.transitions.append(Transition(old_state, self_action, new_state, reward))
 
@@ -127,6 +139,7 @@ def reward_from_events(self, events: List[str]) -> int:
         e.INVALID_ACTION: -1,
         BOMB_DISTANCE_NEAR: -10,
         BOMB_DISTANCE_FAR: 20,
+        AGENT_MOVEMENT_BLOCKED: -5,
         PLACEHOLDER_EVENT: -1
 
     }
