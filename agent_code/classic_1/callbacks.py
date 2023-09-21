@@ -1,12 +1,18 @@
 import os
 import numpy as np
 import math
+
 from datetime import datetime
 from typing import Tuple, List
 from collections import deque
+from igraph import Graph
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTIONS_IDEAS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
+
+# TODO: Check if this values will change. If yes then I can read from settings.py
+n_rows = 17
+n_cols = 17
 
 
 def setup(self):
@@ -109,6 +115,49 @@ def get_neighboring_tiles_within_distance(current_position, max_distance, game_s
     return neighboring_tiles
 
 
+# Calculates all adjacency matrix for the game grid.
+def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
+    if consider_crates:
+        blockers = [(i, j) for i, j in np.ndindex(*game_state["field"].shape) if game_state["field"][i, j] != 0]
+    else:
+        blockers = [(i, j) for i, j in np.ndindex(*game_state["field"].shape) if game_state["field"][i, j] == -1]
+
+    current_explosions = [(i, j) for i, j in np.ndindex(*game_state["explosion_map"].shape) if
+                          game_state["explosion_map"][i, j] != 0]
+
+    bombs = [
+        coordinate
+        for coordinate, _ in game_state["bombs"]
+        if coordinate != game_state["self"][-1]
+           and coordinate not in [other_agent[-1] for other_agent in game_state["others"]]
+    ]
+
+    blockers += current_explosions
+    blockers += bombs
+
+    # self.logger.info(f"Blockers matrix: {blockers}")
+
+    graph = Graph()
+    # format: vertex1--vertex2
+    # --: indicates an edge
+    for i in range(n_rows):
+        for j in range(n_cols):
+            vertex_id = i * n_cols + j
+            graph.add_vertex(vertex_id)
+
+    for i in range(n_rows):
+        for j in range(n_cols):
+            vertex_id = i * n_cols + j
+            if j < n_cols - 1:
+                graph.add_edge(vertex_id, vertex_id + 1)
+            if i < n_rows - 1:
+                graph.add_edge(vertex_id, vertex_id + n_cols)
+
+    # Removing nodes that represent blockers
+    graph.delete_vertices([i * n_cols + j for i, j in blockers])
+    return graph
+
+
 # Feature 1: Count the number of walls in the immediate surrounding tiles within a given radius.
 def count_walls(current_position, game_state, radius):
     return sum(
@@ -200,6 +249,7 @@ def state_to_features(self, game_state, history) -> np.array:
 
     current_position = game_state["self"][-1]
     enemy_positions = [enemy[-1] for enemy in game_state["others"]]
+    adj_graph = calculate_adjacency_matrix(self, game_state, True)
 
     features = np.zeros(10, dtype=np.int8)
 
@@ -221,6 +271,7 @@ def state_to_features(self, game_state, history) -> np.array:
     # feature_id = 2 * features[0] + features[1] + 2 * features[2] + features[3]
 
     self.logger.info(f"Feature vector: {features}")
+    self.logger.info(f"Adjacency Graph: {adj_graph}")
     return features
 
 
