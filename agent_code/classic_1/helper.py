@@ -38,6 +38,11 @@ def visualize_q_table(q_table):
     plt.show()
 
 
+def count_zero_rows(q_table):
+    zero_rows = np.sum(np.all(q_table == 0, axis=1))
+    print("Number of zero rows in Q-table:", zero_rows)
+
+
 q_table_directory_path = "Q_tables"
 loaded_q_table = load_latest_q_table(q_table_directory_path)
 
@@ -45,4 +50,5 @@ if loaded_q_table is not None:
     print("Loaded Q-table shape:", loaded_q_table.shape)
     print("Loaded Q-table:")
     print(loaded_q_table)
+    count_zero_rows(loaded_q_table)
     visualize_q_table(loaded_q_table)
