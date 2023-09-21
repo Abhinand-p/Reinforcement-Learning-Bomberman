@@ -95,9 +95,9 @@ def get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
     neighboring_coordinates = []
     for i in range(1, radius + 1):
         neighboring_coordinates.extend([
-            (x, y + i),  # down
             (x, y - i),  # up
             (x + i, y),  # right
+            (x, y + i),  # down
             (x - i, y)  # left
         ])
     return neighboring_coordinates
@@ -249,22 +249,34 @@ def calculate_death_tile(game_state, own_position) -> int:
 
 
 # Feature 5: Checking for movable tiles
-def compute_blockage(game_state, agent_position):
-    directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # UP, RIGHT, DOWN, LEFT
-    features = [0] * len(directions)
+def compute_blockage(game_state: dict) -> List[str]:
+    # Get current position
+    current_position = game_state["self"][-1]
 
-    for i, direction in enumerate(directions):
-        x, y = agent_position[0] + direction[0], agent_position[1] + direction[1]
+    # Get positions of other agents
+    other_agent_positions = [enemy[-1] for enemy in game_state["others"]]
 
-        # Check if the neighboring tile is within the game field
-        if 0 <= x < len(game_state["field"]) and 0 <= y < len(game_state["field"][0]):
-            content = game_state["field"][x][y]
+    # By default, let the agent move
+    results = ["MOVE"] * 4
 
-            # Check for blockages (e.g., crates, walls, enemies)
-            if content != 0:
-                features[i] = 1
+    # Iterate over adjacent tiles
+    for i, adjacent_coord in enumerate(get_neighboring_tiles(current_position, 1)):
+        adjacent_x, adjacent_y = adjacent_coord
+        adjacent_content = game_state["field"][adjacent_x][adjacent_y]
 
-    return features
+        # Check if adjacent tile has a bomb
+        bomb = False
+        if (adjacent_coord, 0) in game_state["bombs"] or (adjacent_coord, 1,) in game_state["bombs"]:
+            bomb = True
+
+        # Check for explosion in adjacent tile
+        explosion = (True if game_state["explosion_map"][adjacent_x][adjacent_y] != 0 else False)
+
+        # Update result based on conditions
+        # TODO: other_agent_positions -> attack feature should be added
+        if adjacent_content != 0 or adjacent_coord in other_agent_positions or explosion or bomb:
+            results[i] = "BLOCK"
+    return results
 
 
 # Feature 6: Checking for new tile
@@ -427,9 +439,10 @@ def state_to_features(self, game_state) -> np.array:
     coin_direction = shortest_path_to_coin_or_crate(self, game_state)
     if coin_direction in ["DOWN", "UP", "RIGHT", "LEFT"]:
         features_dict["Direction_coin/crate"] = coin_direction
-        self.logger.info(f"state_to_features: Feature 1:{coin_direction}")
+        # self.logger.info(f"state_to_features: Feature 1:{coin_direction}")
     else:
         self.logger.info(f"state_to_features: Feature 1: Invalid direction")
+    (features_dict["Up"], features_dict["Right"], features_dict["Down"], features_dict["Left"]) = compute_blockage(game_state)
 
     # features = np.zeros(10, dtype=np.int8)
     # Calculate features
