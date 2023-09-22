@@ -1,10 +1,12 @@
 import os
-from collections import namedtuple, deque
-from typing import List
-
+import requests
+import wandb
+import random
 import events as e
 import numpy as np
 
+from collections import namedtuple, deque
+from typing import List
 from .callbacks import state_to_features
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
@@ -39,7 +41,6 @@ GOOD_BOMB_ACTION = "GOOD_BOMB_ACTION"
 CRATE_RADAR_HIGH = "CRATE_RADAR_HIGH"
 CRATE_RADAR_LOW = "CRATE_RADAR_LOW"
 
-
 # TODO: Add more events like this to handle bomb state(to avoid killing itself), Enemies distance(to play safe) ...
 
 PLACEHOLDER_EVENT = "PLACEHOLDER"
@@ -58,6 +59,8 @@ def setup_training(self):
     self.episode_gathered_rewards = 0.0
 
     self.transitions = deque(maxlen=TRANSITION_HISTORY_SIZE)
+
+    wandb.init(project="bomberman_rl", entity="abhinand-po")
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):
@@ -136,10 +139,12 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         q_table_file = os.path.join(q_table_folder, f"Q_table-{self.timestamp}")
         np.save(q_table_file, self.Q_table)
 
+    wandb.log({"Episode Reward": self.episode_gathered_rewards})
+
     self.episode_gathered_rewards = 0
     self.episodes += 1
-
     # self.logger.debug(f"Exploration_rate{self.episodes}: {self.exploration_rate}")
+
 
 
 def reward_from_events(self, events: List[str]) -> int:

@@ -111,3 +111,6 @@ screenshots/*.webm
 
 replays/
 results/
+
+.wandb/
+wandb*
