@@ -3,11 +3,12 @@ import numpy as np
 import math
 import networkx as net
 import itertools
-
+import copy as cp
 from datetime import datetime
 from typing import Tuple, List
 from collections import deque
 from igraph import Graph
+from copy import deepcopy
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTIONS_IDEAS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
@@ -75,7 +76,8 @@ def act(self, game_state: dict) -> str:
 def Valid_States() -> np.array:
     feature_list = []
     valid_states = list(itertools.product(('UP', 'RIGHT', 'DOWN', 'LEFT'), ('UP', 'RIGHT', 'DOWN', 'LEFT', 'SAFE'),
-                                          ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK')))
+                                          ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK'),
+                                          ('YES', 'NO')))
 
     for states in valid_states:
         features = {
@@ -85,6 +87,7 @@ def Valid_States() -> np.array:
             "Right": states[3],
             "Down": states[4],
             "Left": states[5],
+            "Place_Bomb": states[6]
         }
         feature_list.append(features)
     return feature_list
@@ -214,12 +217,19 @@ def count_walls(current_position, game_state, radius):
 
 
 # Feature 2: Check for bomb presence in the immediate surrounding tiles within a given radius.
-def check_bomb_presence(current_position, game_state, radius):
-    return any(
-        bomb[0] in get_neighboring_tiles(current_position, radius)
-        and bomb[1] != 0
-        for bomb in game_state["bombs"]
-    )
+def check_bomb_presence(self, game_state) -> str:
+    if game_state["round"] == 1:
+        return 'NO'
+
+    if not game_state["self"][2]:
+        return 'NO'
+
+    new_game_state = cp.deepcopy(game_state)
+    new_game_state["bombs"].append((game_state["self"][-1], 4))
+    if calculate_going_to_new_tiles(self, new_game_state) == "NO_OTHER_OPTION":
+        return 'NO'
+
+    return 'YES'
 
 
 # Feature 3: Check for agent presence in the immediate surrounding tiles within a given radius.
@@ -333,9 +343,9 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
             continue
 
     if not shortest_path:
-        random_choice = np.random.choice(ACTIONS_IDEAS)
-        self.logger.info(f"calculate_going_to_new_tiles: No shortest path {random_choice}")
-        return random_choice
+        # random_choice = np.random.choice(ACTIONS_IDEAS)
+        # self.logger.info(f"calculate_going_to_new_tiles: No shortest path {random_choice}")
+        return "NO_OTHER_OPTION"
 
     return_action = select_best_action(self, current_position, shortest_path)
     self.logger.info(f"calculate_going_to_new_tiles: Action returned {return_action}")
@@ -494,12 +504,20 @@ def state_to_features(self, game_state) -> np.array:
 
     if bomb_safety_result in ["DOWN", "UP", "RIGHT", "LEFT", "SAFE"]:
         features_dict["Direction_bomb"] = bomb_safety_result
+
+    elif bomb_safety_result == 'NO_OTHER_OPTION':
+        random_choice = np.random.choice(ACTIONS_IDEAS)
+        self.logger.info(f"calculate_going_to_new_tiles: No shortest path {random_choice}")
+        features_dict["Direction_bomb"] = random_choice
     else:
         self.logger.info(
             f"!!! state_to_features: calculate_going_to_new_tiles: Invalid direction: {bomb_safety_result}")
 
     (features_dict["Up"], features_dict["Right"], features_dict["Down"], features_dict["Left"]) = compute_blockage(
         game_state)
+
+    features_dict["Place_Bomb"] = check_bomb_presence(self, game_state)
+
 
     # features = np.zeros(10, dtype=np.int8)
     # Calculate features

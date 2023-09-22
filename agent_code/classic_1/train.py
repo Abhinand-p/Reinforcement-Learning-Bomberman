@@ -31,6 +31,9 @@ BOMB_DISTANCE_FAR = "BOMB_DISTANCE_FAR"
 # Custom Event: 4 -> Blocking the movement
 AGENT_MOVEMENT_BLOCKED = "AGENT_MOVEMENT_BLOCKED"
 
+# Custom Event: 5 -> Bad Bomb action
+BAD_BOMB_ACTION = "BAD_BOMB_ACTION"
+
 
 # TODO: Add more events like this to handle bomb state(to avoid killing itself), Enemies distance(to play safe) ...
 
@@ -76,7 +79,10 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
         events.append(AGENT_MOVEMENT_BLOCKED)
     elif previous_feature_dict["Left"] == "BLOCK" and self_action == "LEFT":
         events.append(AGENT_MOVEMENT_BLOCKED)
-    
+
+    if previous_feature_dict["Place_Bomb"] == 'NO' and self_action == "BOMB":
+        events.append(BAD_BOMB_ACTION)
+
     reward = reward_from_events(self, events)
     self.transitions.append(Transition(old_state, self_action, new_state, reward))
 
@@ -140,6 +146,7 @@ def reward_from_events(self, events: List[str]) -> int:
         BOMB_DISTANCE_NEAR: -10,
         BOMB_DISTANCE_FAR: 20,
         AGENT_MOVEMENT_BLOCKED: -5,
+        BAD_BOMB_ACTION: -50,
         PLACEHOLDER_EVENT: -1
 
     }
