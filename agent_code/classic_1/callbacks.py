@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import math
-import networkx as nx
+import networkx as net
 import itertools
 
 from datetime import datetime
@@ -90,20 +90,24 @@ def Valid_States() -> np.array:
     return feature_list
 
 
+# TODO: Should I limit the negative coordinates here?
+# Logic has been verified
 def get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
     x, y = own_coord
+
     # Finding neighbouring tiles
-    neighboring_coordinates = []
+    adjacent_coordinates = []
     for i in range(1, radius + 1):
-        neighboring_coordinates.extend([
+        adjacent_coordinates.extend([
             (x, y - i),  # up
             (x + i, y),  # right
             (x, y + i),  # down
             (x - i, y)  # left
         ])
-    return neighboring_coordinates
+    return adjacent_coordinates
 
 
+# Logic has been verified
 def get_neighboring_tiles_within_distance(current_position, max_distance, game_state) -> List[Tuple[int]]:
     directions = ["top", "right_side", "bottom", "left_side"]
     current_x, current_y = current_position[0], current_position[1]
@@ -141,7 +145,8 @@ def get_neighboring_tiles_within_distance(current_position, max_distance, game_s
     return neighboring_tiles
 
 
-# Calculates all adjacency matrix for the game grid.
+# Calculates all adjacency matrix's for the game grid.
+# Logic has been verified
 def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
     if consider_crates:
         blockers = [(i, j) for i, j in np.ndindex(*game_state["field"].shape) if game_state["field"][i, j] != 0]
@@ -152,10 +157,10 @@ def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
                           game_state["explosion_map"][i, j] != 0]
 
     bombs = [
-        coordinate
-        for coordinate, _ in game_state["bombs"]
-        if coordinate != game_state["self"][-1]
-           and coordinate not in [other_agent[-1] for other_agent in game_state["others"]]
+        bombs_coordinate
+        for bombs_coordinate, i in game_state["bombs"]
+        if bombs_coordinate != game_state["self"][-1] and bombs_coordinate not in [other_agent[-1] for other_agent in
+                                                                                   game_state["others"]]
     ]
 
     blockers += current_explosions
@@ -163,7 +168,7 @@ def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
 
     # self.logger.info(f"Blockers matrix: {blockers}")
 
-    graph = nx.grid_2d_graph(m=n_cols, n=n_rows)
+    graph = net.grid_2d_graph(m=n_cols, n=n_rows)
 
     # Removing nodes that represent blockers
     graph.remove_nodes_from(blockers)
@@ -171,31 +176,32 @@ def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
 
 
 # A helper function to get the shortest path between two coordinates.
-def find_shortest_path_coordinates(graph, a, b) -> Tuple[Graph, int]:
+def find_shortest_path_coordinates(graph, source, target) -> Tuple[Graph, int]:
     try:
-        shortest_path = nx.shortest_path(graph, source=a, target=b, weight=None, method="dijkstra")
-    except nx.exception.NodeNotFound as e:
-        print(graph.nodes)
+        shortest_path = net.shortest_path(graph, source=source, target=target, weight=None, method="dijkstra")
+    except net.exception.NodeNotFound as e:
+        print("!!! Exception raised in find_shortest_path_coordinates !!!")
         raise e
 
-    shortest_path_length = len(shortest_path) - 1  # because path considers self as part of the path
+    shortest_path_length = len(shortest_path) - 1
     return shortest_path, shortest_path_length
 
 
 # A helper function to select the best action given the current position
-def select_best_action(self, current_coord, next_coord):
-    x_diff = next_coord[0] - current_coord[0]
-    y_diff = next_coord[1] - current_coord[1]
+def select_best_action(self, current_coord, next_coords) -> str:
+    next_coord = next_coords[1]
 
-    # ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT']
-    if np.any(x_diff == 1):
-        return "RIGHT"  # RIGHT
-    elif np.any(x_diff == -1):
-        return "LEFT"  # LEFT
-    elif np.any(y_diff == 1):
-        return "UP"  # UP
-    elif np.any(y_diff == -1):
-        return "DOWN"  # DOWN
+    if current_coord[1] == next_coord[1]:
+        if current_coord[0] - 1 == next_coord[0]:
+            return "LEFT"
+        elif current_coord[0] + 1 == next_coord[0]:
+            return "RIGHT"
+
+    elif current_coord[0] == next_coord[0]:
+        if current_coord[1] - 1 == next_coord[1]:
+            return "UP"
+        elif current_coord[1] + 1 == next_coord[1]:
+            return "DOWN"
 
 
 # Feature 1: Count the number of walls in the immediate surrounding tiles within a given radius.
@@ -310,7 +316,7 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
     adjacent_positions = get_neighboring_tiles(current_position, effect)
 
     shortest_path = None
-    shortest_distance = float("inf")
+    shortest_distance = 1000
 
     # Find the shortest safe path to a reachable tile
     for adjacent in adjacent_positions:
@@ -323,7 +329,7 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
                 shortest_path = current_shortest_path
                 shortest_distance = current_shortest_distance
 
-        except nx.exception.NetworkXNoPath:
+        except net.exception.NetworkXNoPath:
             continue
 
     if not shortest_path:
@@ -331,7 +337,9 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
         self.logger.info(f"calculate_going_to_new_tiles: No shortest path {random_choice}")
         return random_choice
 
-    return select_best_action(self, current_position, shortest_path)
+    return_action = select_best_action(self, current_position, shortest_path)
+    self.logger.info(f"calculate_going_to_new_tiles: Action returned {return_action}")
+    return return_action
 
 
 # Feature 7: Calculating the direction to coin/crate
@@ -371,14 +379,14 @@ def shortest_path_to_coin_or_crate(agent, game_state):
                 current_path, current_path_length = find_shortest_path_coordinates(graph_with_crates, current_position,
                                                                                    crate_coord)
 
-            except nx.exception.NetworkXNoPath:
+            except net.exception.NetworkXNoPath:
                 agent.logger.info("shortest_path_to_coin_or_crate: Crate may be exploded")
                 continue
 
             if current_path_length == 1:
                 # TODO: Should I modify the code to add an action to bomb here for this case?
                 agent.logger.info(f"shortest_path_to_coin_or_crate: Agent next to a crate")
-                return select_best_action(agent, current_position, current_path[0])
+                return select_best_action(agent, current_position, current_path)
 
             elif current_path_length < next_crate_position[1]:
                 next_crate_position = (current_path, current_path_length)
@@ -389,7 +397,7 @@ def shortest_path_to_coin_or_crate(agent, game_state):
             agent.logger.info(f"shortest_path_to_coin_or_crate: no crate or a good coin still: {random_choice}")
             return random_choice
 
-        return select_best_action(agent, current_position, next_crate_position[0][0])
+        return select_best_action(agent, current_position, next_crate_position[0])
 
     # If there are only good coins
     else:
@@ -400,12 +408,12 @@ def shortest_path_to_coin_or_crate(agent, game_state):
             try:
                 current_path, current_path_length = find_shortest_path_coordinates(graph, current_position, coin_coord)
                 current_reachable = True
-            except nx.exception.NetworkXNoPath:
+            except net.exception.NetworkXNoPath:
                 try:
                     current_path, current_path_length = find_shortest_path_coordinates(graph_with_crates,
                                                                                        current_position, coin_coord)
                     current_reachable = False
-                except nx.exception.NetworkXNoPath:
+                except net.exception.NetworkXNoPath:
                     agent.logger.info("shortest_path_to_coin_or_crate: Corner case 1")
                     continue
 
@@ -423,13 +431,13 @@ def shortest_path_to_coin_or_crate(agent, game_state):
                                                                                                                coin_coord)
                     current_other_agent_reachable = True
 
-                except nx.exception.NetworkXNoPath:
+                except net.exception.NetworkXNoPath:
                     try:
                         current_path_other_agent, current_path_length_other_agent = find_shortest_path_coordinates(
                             graph_with_crates, other_agent_coord, coin_coord)
                         current_other_agent_reachable = False
 
-                    except nx.exception.NetworkXNoPath:
+                    except net.exception.NetworkXNoPath:
                         agent.logger.info("shortest_path_to_coin_or_crate: Corner case 2")
                         continue
 
@@ -453,7 +461,7 @@ def shortest_path_to_coin_or_crate(agent, game_state):
 
         # If no paths are reachable to coins
         if not any(coin_path_reachable):
-            return select_best_action(agent, current_position, coin_path[0][0])
+            return select_best_action(agent, current_position, coin_path[0][0][0])
 
         # If there is only one coin path reachable
         elif coin_path_reachable.count(True) == 1:
@@ -479,24 +487,16 @@ def state_to_features(self, game_state) -> np.array:
     coin_direction = shortest_path_to_coin_or_crate(self, game_state)
     if coin_direction in ["DOWN", "UP", "RIGHT", "LEFT"]:
         features_dict["Direction_coin/crate"] = coin_direction
-        # self.logger.info(f"state_to_features: Feature 1:{coin_direction}")
     else:
-        # TODO: Check why for some it is still none
-        self.logger.info(f"state_to_features: shortest_path_to_coin_or_crate: Invalid direction:{coin_direction}")
-        random_choice = np.random.choice(ACTIONS_IDEAS)
-        self.logger.info(f"state_to_features: shortest_path_to_coin_or_crate: Invalid direction: {random_choice}")
-        features_dict["Direction_coin/crate"] = random_choice
+        self.logger.info(f"!!! state_to_features: shortest_path_to_coin_or_crate: Invalid direction: {coin_direction}")
 
     bomb_safety_result = calculate_going_to_new_tiles(self, game_state)
 
     if bomb_safety_result in ["DOWN", "UP", "RIGHT", "LEFT", "SAFE"]:
         features_dict["Direction_bomb"] = bomb_safety_result
     else:
-        # TODO: Check why for some it is still none
-        self.logger.info(f"state_to_features: calculate_going_to_new_tiles: Invalid direction: {bomb_safety_result}")
-        random_choice = np.random.choice(ACTIONS_IDEAS)
-        self.logger.info(f"state_to_features: calculate_going_to_new_tiles: Invalid direction:  {random_choice}")
-        features_dict["Direction_bomb"] = random_choice
+        self.logger.info(
+            f"!!! state_to_features: calculate_going_to_new_tiles: Invalid direction: {bomb_safety_result}")
 
     (features_dict["Up"], features_dict["Right"], features_dict["Down"], features_dict["Left"]) = compute_blockage(
         game_state)
