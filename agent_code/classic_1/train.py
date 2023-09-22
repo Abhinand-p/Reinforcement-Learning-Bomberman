@@ -33,6 +33,11 @@ AGENT_MOVEMENT_BLOCKED = "AGENT_MOVEMENT_BLOCKED"
 
 # Custom Event: 5 -> Bad Bomb action
 BAD_BOMB_ACTION = "BAD_BOMB_ACTION"
+GOOD_BOMB_ACTION = "GOOD_BOMB_ACTION"
+
+# Custom Event: 6 -> Crate Radar
+CRATE_RADAR_HIGH = "CRATE_RADAR_HIGH"
+CRATE_RADAR_LOW = "CRATE_RADAR_LOW"
 
 
 # TODO: Add more events like this to handle bomb state(to avoid killing itself), Enemies distance(to play safe) ...
@@ -83,6 +88,17 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     if previous_feature_dict["Place_Bomb"] == 'NO' and self_action == "BOMB":
         events.append(BAD_BOMB_ACTION)
 
+    if previous_feature_dict["Place_Bomb"] == 'YES':
+        if self_action == "BOMB":
+            if previous_feature_dict["Crate_Radar"] == 'HIGH':
+                events.append(CRATE_RADAR_HIGH)
+                events.append(GOOD_BOMB_ACTION)
+            elif previous_feature_dict["Crate_Radar"] == 'LOW':
+                events.append(CRATE_RADAR_LOW)
+                events.append(GOOD_BOMB_ACTION)
+            else:
+                events.append(BAD_BOMB_ACTION)
+
     reward = reward_from_events(self, events)
     self.transitions.append(Transition(old_state, self_action, new_state, reward))
 
@@ -130,23 +146,31 @@ def reward_from_events(self, events: List[str]) -> int:
     game_rewards = {
         e.COIN_COLLECTED: 50,
         e.KILLED_OPPONENT: 200,
-        e.BOMB_DROPPED: 5,
-        # e.BOMB_EXPLODED: 0,
-        e.CRATE_DESTROYED: 5,
-        # e.COIN_FOUND: 0,
+
+        e.CRATE_DESTROYED: 50,
+        CRATE_RADAR_HIGH: 30,
+        CRATE_RADAR_LOW: 10,
+
+        BOMB_DISTANCE_NEAR: -10,
+        BOMB_DISTANCE_FAR: 20,
+        BAD_BOMB_ACTION: -50,
+        GOOD_BOMB_ACTION: 20,
+
+        AGENT_MOVEMENT_BLOCKED: -5,
+
         e.KILLED_SELF: -10,
         e.GOT_KILLED: -50,
-        e.OPPONENT_ELIMINATED: 0.5,
+        e.OPPONENT_ELIMINATED: 5,
+
         # e.SURVIVED_ROUND: 0,
         # e.MOVED_LEFT: 3,
         # e.MOVED_RIGHT: 3,
         # e.MOVED_UP: 3,
         # e.MOVED_DOWN: 3,
-        e.INVALID_ACTION: -1,
-        BOMB_DISTANCE_NEAR: -10,
-        BOMB_DISTANCE_FAR: 20,
-        AGENT_MOVEMENT_BLOCKED: -5,
-        BAD_BOMB_ACTION: -50,
+        # e.BOMB_DROPPED: 5,
+        # e.BOMB_EXPLODED: 0,
+        # e.INVALID_ACTION: -1,
+        # e.COIN_FOUND: 0,
         PLACEHOLDER_EVENT: -1
 
     }

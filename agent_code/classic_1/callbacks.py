@@ -77,7 +77,7 @@ def Valid_States() -> np.array:
     feature_list = []
     valid_states = list(itertools.product(('UP', 'RIGHT', 'DOWN', 'LEFT'), ('UP', 'RIGHT', 'DOWN', 'LEFT', 'SAFE'),
                                           ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK'), ('MOVE', 'BLOCK'),
-                                          ('YES', 'NO')))
+                                          ('YES', 'NO'), ('LOW', 'MID', 'HIGH')))
 
     for states in valid_states:
         features = {
@@ -87,7 +87,8 @@ def Valid_States() -> np.array:
             "Right": states[3],
             "Down": states[4],
             "Left": states[5],
-            "Place_Bomb": states[6]
+            "Place_Bomb": states[6],
+            "Crate_Radar": states[7],
         }
         feature_list.append(features)
     return feature_list
@@ -232,16 +233,32 @@ def check_bomb_presence(self, game_state) -> str:
     return 'YES'
 
 
-# Feature 3: Check for agent presence in the immediate surrounding tiles within a given radius.
-def check_agent_presence(current_position, game_state, radius):
-    return any(
-        agent[3] in get_neighboring_tiles(current_position, radius)
-        for agent in game_state["others"]
-    )
+# Feature 3: Check for crate presence in the immediate surrounding tiles within a given radius.
+def check_crate_presence(game_state) -> str:
+    current_position = game_state["self"][-1]
+    adjacent = get_neighboring_tiles_within_distance(current_position, 3, game_state)
+
+    crate_reward = 0
+    for coord in adjacent:
+        if game_state["field"][coord[0]][coord[1]] == 1:
+            crate_reward += 1
+            # Vertical crate check
+            if current_position[1] == coord[1] + 1 or current_position[1] == coord[1] - 1:
+                crate_reward += 3
+            # Horizontal crate check
+            elif current_position[0] == coord[0] + 1 or current_position[0] == coord[0] - 1:
+                crate_reward += 3
+
+    if crate_reward == 0:
+        return 'LOW'
+    elif 1 <= crate_reward < 4:
+        return 'MID'
+    elif crate_reward >= 4:
+        return 'HIGH'
 
 
 # Feature 4: Getting the number of tiles in each direction of the agent. 0: free tiles and 1:crates
-def calculate_death_tile(game_state, own_position) -> int:
+def calculate_death_tile(game_state, current_position) -> int:
     all_death_tiles = []
     is_dangerous = []
 
@@ -256,7 +273,7 @@ def calculate_death_tile(game_state, own_position) -> int:
 
         if len(all_death_tiles) > 0:
             for death_tile in all_death_tiles:
-                in_danger = own_position == death_tile
+                in_danger = current_position == death_tile
                 is_dangerous.append(in_danger)
             # 1 if the agent is on a death tile.
             # 0 if the agent is not on a death tile.
@@ -518,6 +535,7 @@ def state_to_features(self, game_state) -> np.array:
 
     features_dict["Place_Bomb"] = check_bomb_presence(self, game_state)
 
+    features_dict["Crate_Radar"] = check_crate_presence(game_state)
 
     # features = np.zeros(10, dtype=np.int8)
     # Calculate features
