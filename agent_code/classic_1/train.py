@@ -33,7 +33,11 @@ CRATE_RADAR_LOW = "CRATE_RADAR_LOW"
 
 # Custom Event: 5 -> Escape Bomb
 ESCAPE_BOMB_YES = "ESCAPE_BOMB_YES"
-ESCAPE_BOMB_NO = "ESCAPE_BOMB_YES"
+ESCAPE_BOMB_NO = "ESCAPE_BOMB_NO"
+
+# Custom Event: 6 -> Coin search
+COIN_SEARCH_YES = "COIN_SEARCH_YES"
+COIN_SEARCH_NO = "COIN_SEARCH_NO"
 
 
 def setup_training(self):
@@ -94,17 +98,37 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
                 events.append(BAD_BOMB_ACTION)
 
     if previous_feature_dict["Direction_bomb"] != 'SAFE':
-
+        escape_bomb = True
         if previous_feature_dict["Direction_bomb"] == 'UP' and previous_feature_dict["Up"] == "BLOCK":
-            events.append(ESCAPE_BOMB_NO)
-        elif previous_feature_dict["Direction_bomb"] == 'RIGHT' and previous_feature_dict["Right"] == "BLOCK":
-            events.append(ESCAPE_BOMB_NO)
-        elif previous_feature_dict["Direction_bomb"] == 'DOWN' and previous_feature_dict["Down"] == "BLOCK":
-            events.append(ESCAPE_BOMB_NO)
-        elif previous_feature_dict["Direction_bomb"] == 'LEFT' and previous_feature_dict["Left"] == "BLOCK":
-            events.append(ESCAPE_BOMB_NO)
-        else:
-            events.append(ESCAPE_BOMB_YES)
+            escape_bomb = False
+        if previous_feature_dict["Direction_bomb"] == 'RIGHT' and previous_feature_dict["Right"] == "BLOCK":
+            escape_bomb = False
+        if previous_feature_dict["Direction_bomb"] == 'DOWN' and previous_feature_dict["Down"] == "BLOCK":
+            escape_bomb = False
+        if previous_feature_dict["Direction_bomb"] == 'LEFT' and previous_feature_dict["Left"] == "BLOCK":
+            escape_bomb = False
+
+        if escape_bomb:
+            if previous_feature_dict["Direction_bomb"] == self_action:
+                events.append(COIN_SEARCH_YES)
+            else:
+                events.append(COIN_SEARCH_NO)
+
+        coin_collect = True
+        if previous_feature_dict["Direction_coin/crate"] == 'UP' and previous_feature_dict["Up"] == "BLOCK":
+            coin_collect = False
+        if previous_feature_dict["Direction_coin/crate"] == 'RIGHT' and previous_feature_dict["Right"] == "BLOCK":
+            coin_collect = False
+        if previous_feature_dict["Direction_coin/crate"] == 'DOWN' and previous_feature_dict["Down"] == "BLOCK":
+            coin_collect = False
+        if previous_feature_dict["Direction_coin/crate"] == 'LEFT' and previous_feature_dict["Left"] == "BLOCK":
+            coin_collect = False
+
+        if coin_collect:
+            if previous_feature_dict["Direction_coin/crate"] == self_action:
+                events.append(ESCAPE_BOMB_YES)
+            else:
+                events.append(ESCAPE_BOMB_NO)
 
     reward = reward_from_events(self, events)
     self.transitions.append(Transition(old_state, self_action, new_state, reward))
@@ -182,6 +206,8 @@ def reward_from_events(self, events: List[str]) -> int:
     game_rewards = {
         e.COIN_COLLECTED: 50,
         e.KILLED_OPPONENT: 200,
+        COIN_SEARCH_YES: 30,
+        COIN_SEARCH_NO: -50,
 
         e.CRATE_DESTROYED: 50,
         CRATE_RADAR_HIGH: 30,
