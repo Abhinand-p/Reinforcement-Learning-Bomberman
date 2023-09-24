@@ -1,7 +1,5 @@
 import os
-import requests
 import wandb
-import random
 import events as e
 import numpy as np
 
@@ -15,35 +13,23 @@ ACTION_INDEX = {action: index for index, action in enumerate(ACTIONS)}
 
 # Hyper parameters
 TRANSITION_HISTORY_SIZE = 3
-RECORD_ENEMY_TRANSITIONS = 1.0
 
-# Events
-# Custom Event: 1 -> Coin Collection event
-COIN_DISTANCE_NEAR = "COIN_DISTANCE_NEAR"
-COIN_DISTANCE_FAR = "COIN_DISTANCE_FAR"
+# Custom Events
 
-# Custom Event: 2 -> Crate explosion event
-CRATE_DISTANCE_NEAR = "CRATE_DISTANCE_NEAR"
-CRATE_DISTANCE_FAR = "CRATE_DISTANCE_FAR"
-
-# Custom Event: 3 -> Bomb location event
+# Custom Event: 1 -> Bomb location event
 BOMB_DISTANCE_NEAR = "BOMB_DISTANCE_NEAR"
 BOMB_DISTANCE_FAR = "BOMB_DISTANCE_FAR"
 
-# Custom Event: 4 -> Blocking the movement
+# Custom Event: 2 -> Blocking the movement
 AGENT_MOVEMENT_BLOCKED = "AGENT_MOVEMENT_BLOCKED"
 
-# Custom Event: 5 -> Bad Bomb action
+# Custom Event: 3 -> Bad Bomb action
 BAD_BOMB_ACTION = "BAD_BOMB_ACTION"
 GOOD_BOMB_ACTION = "GOOD_BOMB_ACTION"
 
-# Custom Event: 6 -> Crate Radar
+# Custom Event: 4 -> Crate Radar
 CRATE_RADAR_HIGH = "CRATE_RADAR_HIGH"
 CRATE_RADAR_LOW = "CRATE_RADAR_LOW"
-
-# TODO: Add more events like this to handle bomb state(to avoid killing itself), Enemies distance(to play safe) ...
-
-PLACEHOLDER_EVENT = "PLACEHOLDER"
 
 
 def setup_training(self):
@@ -60,6 +46,7 @@ def setup_training(self):
 
     self.transitions = deque(maxlen=TRANSITION_HISTORY_SIZE)
 
+    # Logging in wandb
     wandb.init(project="bomberman_rl", entity="abhinand-po")
 
 
@@ -139,12 +126,21 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
         q_table_file = os.path.join(q_table_folder, f"Q_table-{self.timestamp}")
         np.save(q_table_file, self.Q_table)
 
-    wandb.log({"Episode Reward": self.episode_gathered_rewards})
+    # Log exploration rate
+    wandb.log({"Exploration_rate": self.exploration_rate}, step=int(self.episodes))
+
+    # Log total rewards for the episode
+    wandb.log({"Total_Rewards_Per_Episode": int(self.episode_gathered_rewards)}, step=int(self.episodes))
+
+    # Log additional metrics based on events or any other relevant information
+    if AGENT_MOVEMENT_BLOCKED in events:
+        wandb.log({"Agent_Movement_Blocked": 1}, step=int(self.episodes))
+    else:
+        wandb.log({"Agent_Movement_Blocked": 0}, step=int(self.episodes))
 
     self.episode_gathered_rewards = 0
     self.episodes += 1
     # self.logger.debug(f"Exploration_rate{self.episodes}: {self.exploration_rate}")
-
 
 
 def reward_from_events(self, events: List[str]) -> int:
@@ -176,8 +172,6 @@ def reward_from_events(self, events: List[str]) -> int:
         # e.BOMB_EXPLODED: 0,
         # e.INVALID_ACTION: -1,
         # e.COIN_FOUND: 0,
-        PLACEHOLDER_EVENT: -1
-
     }
     reward_sum = 0
     for event in events:

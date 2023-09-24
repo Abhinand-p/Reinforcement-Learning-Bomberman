@@ -5,15 +5,14 @@ import networkx as net
 import itertools
 import copy as cp
 from datetime import datetime
-from typing import Tuple, List
+from typing import List
 from collections import deque
-from igraph import Graph
-from copy import deepcopy
+from .support import get_neighboring_tiles, get_neighboring_tiles_within_distance, calculate_adjacency_matrix, \
+    find_shortest_path_coordinates, select_best_action
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTIONS_IDEAS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
-n_rows = 17
-n_cols = 17
+
 bomb_power = 4
 
 
@@ -40,16 +39,7 @@ def setup(self):
         self.Q_table = load_latest_q_table(self, q_table_folder)
 
 
-def set_decay_rate(self) -> float:
-    # This method utilizes the n_rounds to set the decay rate
-    decay_rate = -math.log((self.exploration_rate_end + 0.005) / self.exploration_rate_initial) / self.n_rounds
-    self.logger.info(f" n_rounds: {self.n_rounds}")
-    self.logger.info(f"Determined exploration decay rate: {decay_rate}")
-    return decay_rate
-
-
 def act(self, game_state: dict) -> str:
-    # Testing this logic
     if self.new_state is None:
         self.old_state = state_to_features(self, game_state)
     else:
@@ -59,7 +49,6 @@ def act(self, game_state: dict) -> str:
     self.logger.info(f"act: State: {state}")
 
     if self.train and np.random.random() < self.exploration_rate:
-        # TODO: Check if during exploring random choice is the best option because we do not want self explosions.
         action = np.random.choice(ACTIONS)
         self.logger.info(f"act: Exploring: {action}")
         return action
@@ -73,6 +62,15 @@ def act(self, game_state: dict) -> str:
     return action
 
 
+def set_decay_rate(self) -> float:
+    # This method utilizes the n_rounds to set the decay rate
+    decay_rate = -math.log((self.exploration_rate_end + 0.005) / self.exploration_rate_initial) / self.n_rounds
+    self.logger.info(f" n_rounds: {self.n_rounds}")
+    self.logger.info(f"Determined exploration decay rate: {decay_rate}")
+    return decay_rate
+
+
+# This method defines all the possible values each feature can hold in the feature dictionary
 def Valid_States() -> np.array:
     feature_list = []
     valid_states = list(itertools.product(('UP', 'RIGHT', 'DOWN', 'LEFT'), ('UP', 'RIGHT', 'DOWN', 'LEFT', 'SAFE'),
@@ -92,120 +90,6 @@ def Valid_States() -> np.array:
         }
         feature_list.append(features)
     return feature_list
-
-
-# TODO: Should I limit the negative coordinates here?
-# Logic has been verified
-def get_neighboring_tiles(own_coord, radius) -> List[Tuple[int]]:
-    x, y = own_coord
-
-    # Finding neighbouring tiles
-    adjacent_coordinates = []
-    for i in range(1, radius + 1):
-        adjacent_coordinates.extend([
-            (x, y - i),  # up
-            (x + i, y),  # right
-            (x, y + i),  # down
-            (x - i, y)  # left
-        ])
-    return adjacent_coordinates
-
-
-# Logic has been verified
-def get_neighboring_tiles_within_distance(current_position, max_distance, game_state) -> List[Tuple[int]]:
-    directions = ["top", "right_side", "bottom", "left_side"]
-    current_x, current_y = current_position[0], current_position[1]
-    neighboring_tiles = []
-
-    for d, direction in enumerate(directions):
-        valid_tiles = []
-        for i in range(1, max_distance + 1):
-            try:
-                if direction == "top":
-                    if game_state["field"][current_x][current_y + i] in [0, 1]:
-                        valid_tiles += [(current_x, current_y + i)]
-                    else:
-                        break
-                elif direction == "right_side":
-                    if game_state["field"][current_x + i][current_y] in [0, 1]:
-                        valid_tiles += [(current_x + i, current_y)]
-                    else:
-                        break
-                elif direction == "bottom":
-                    if game_state["field"][current_x][current_y - i] in [0, 1]:
-                        valid_tiles += [(current_x, current_y - i)]
-                    else:
-                        break
-                elif direction == "left_side":
-                    if game_state["field"][current_x - i][current_y] in [0, 1]:
-                        valid_tiles += [(current_x - i, current_y)]
-                    else:
-                        break
-            except IndexError:
-                break
-
-        neighboring_tiles += valid_tiles
-
-    return neighboring_tiles
-
-
-# Calculates all adjacency matrix's for the game grid.
-# Logic has been verified
-def calculate_adjacency_matrix(self, game_state, consider_crates=True) -> Graph:
-    if consider_crates:
-        blockers = [(i, j) for i, j in np.ndindex(*game_state["field"].shape) if game_state["field"][i, j] != 0]
-    else:
-        blockers = [(i, j) for i, j in np.ndindex(*game_state["field"].shape) if game_state["field"][i, j] == -1]
-
-    current_explosions = [(i, j) for i, j in np.ndindex(*game_state["explosion_map"].shape) if
-                          game_state["explosion_map"][i, j] != 0]
-
-    bombs = [
-        bombs_coordinate
-        for bombs_coordinate, i in game_state["bombs"]
-        if bombs_coordinate != game_state["self"][-1] and bombs_coordinate not in [other_agent[-1] for other_agent in
-                                                                                   game_state["others"]]
-    ]
-
-    blockers += current_explosions
-    blockers += bombs
-
-    # self.logger.info(f"Blockers matrix: {blockers}")
-
-    graph = net.grid_2d_graph(m=n_cols, n=n_rows)
-
-    # Removing nodes that represent blockers
-    graph.remove_nodes_from(blockers)
-    return graph
-
-
-# A helper function to get the shortest path between two coordinates.
-def find_shortest_path_coordinates(graph, source, target) -> Tuple[Graph, int]:
-    try:
-        shortest_path = net.shortest_path(graph, source=source, target=target, weight=None, method="dijkstra")
-    except net.exception.NodeNotFound as e:
-        print("!!! Exception raised in find_shortest_path_coordinates !!!")
-        raise e
-
-    shortest_path_length = len(shortest_path) - 1
-    return shortest_path, shortest_path_length
-
-
-# A helper function to select the best action given the current position
-def select_best_action(self, current_coord, next_coords) -> str:
-    next_coord = next_coords[1]
-
-    if current_coord[1] == next_coord[1]:
-        if current_coord[0] - 1 == next_coord[0]:
-            return "LEFT"
-        elif current_coord[0] + 1 == next_coord[0]:
-            return "RIGHT"
-
-    elif current_coord[0] == next_coord[0]:
-        if current_coord[1] - 1 == next_coord[1]:
-            return "UP"
-        elif current_coord[1] + 1 == next_coord[1]:
-            return "DOWN"
 
 
 # Feature 1: Count the number of walls in the immediate surrounding tiles within a given radius.
