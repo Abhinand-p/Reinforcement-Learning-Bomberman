@@ -1,4 +1,4 @@
-# This file contains all methods that support to calculate the features
+# This file contains all methods that support to calculate the features.
 import numpy as np
 import networkx as net
 from typing import Tuple, List

@@ -12,9 +12,7 @@ ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTION_INDEX = {action: index for index, action in enumerate(ACTIONS)}
 
 # Hyper parameters
-TRANSITION_HISTORY_SIZE = 3
-
-# Custom Events
+TRANSITION_HISTORY_SIZE = 1
 
 # Custom Event: 1 -> Bomb location event
 BOMB_DISTANCE_NEAR = "BOMB_DISTANCE_NEAR"
