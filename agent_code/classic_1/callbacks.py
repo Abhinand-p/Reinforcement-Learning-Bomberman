@@ -4,16 +4,18 @@ import math
 import networkx as net
 import itertools
 import copy as cp
-from datetime import datetime
+
 from typing import List
 from collections import deque
+from settings import BOMB_POWER
+
 from .support import get_neighboring_tiles, get_neighboring_tiles_within_distance, calculate_adjacency_matrix, \
     find_shortest_path_coordinates, select_best_action
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTIONS_IDEAS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
 
-bomb_power = 4
+bomb_power = BOMB_POWER
 
 
 def setup(self):
@@ -27,7 +29,7 @@ def setup(self):
 
     if self.train:
         self.logger.info("Q-Learning algorithm.")
-        self.timestamp = datetime.now().strftime("%dT%H:%M:%S")
+        self.name = "Table_1"
         self.number_of_states = len(self.valid_list)
         self.Q_table = np.zeros(shape=(self.number_of_states, len(ACTIONS)))  # number_of_states * 6
         self.exploration_rate_initial = 1.0
@@ -120,7 +122,7 @@ def check_bomb_presence(self, game_state) -> str:
 # Feature 3: Check for crate presence in the immediate surrounding tiles within a given radius.
 def check_crate_presence(game_state) -> str:
     current_position = game_state["self"][-1]
-    adjacent = get_neighboring_tiles_within_distance(current_position, 3, game_state)
+    adjacent = get_neighboring_tiles_within_distance(current_position, bomb_power, game_state)
 
     crate_reward = 0
     for coord in adjacent:
@@ -149,9 +151,7 @@ def calculate_death_tile(game_state, current_position) -> int:
     if len(game_state["bombs"]) > 0:
         for bomb in game_state["bombs"]:
             bomb_position = bomb[0]
-            neighboring_death_tiles = get_neighboring_tiles_within_distance(
-                bomb_position, 3, game_state=game_state
-            )
+            neighboring_death_tiles = get_neighboring_tiles_within_distance(bomb_position, bomb_power, game_state)
             if neighboring_death_tiles:
                 all_death_tiles += neighboring_death_tiles
 
@@ -168,31 +168,30 @@ def calculate_death_tile(game_state, current_position) -> int:
 
 # Feature 5: Checking for movable tiles based on other agents, bombs, explosions
 def compute_blockage(game_state: dict) -> List[str]:
+    # Initialize an empty set to track explosion positions
+    explosion = set()
+    # Initialize an empty list to store bomb positions
+    bombs = []
     # Get current position
     current_position = game_state["self"][-1]
-
     # Get positions of other agents
     other_agent_positions = [enemy[-1] for enemy in game_state["others"]]
-
     # By default, let the agent move
     results = ["MOVE"] * 4
-
-    # Iterate over adjacent tiles
-    for i, adjacent_coord in enumerate(get_neighboring_tiles(current_position, 1)):
-        adjacent_x, adjacent_y = adjacent_coord
-        adjacent_content = game_state["field"][adjacent_x][adjacent_y]
-
-        # Check if adjacent tile has a bomb
-        bomb = False
-        if (adjacent_coord, 0) in game_state["bombs"] or (adjacent_coord, 1,) in game_state["bombs"]:
-            bomb = True
-
-        # Check for explosion in adjacent tile
-        explosion = (True if game_state["explosion_map"][adjacent_x][adjacent_y] != 0 else False)
-
-        # Update result based on conditions
-        # TODO: other_agent_positions -> attack feature should be added
-        if adjacent_content != 0 or adjacent_coord in other_agent_positions or explosion or bomb:
+    # Calculate where the explosions can happen
+    for bomb_position, bomb_timer in game_state["bombs"]:
+        bombs.append(bomb_position)
+        if bomb_timer == 0:
+            next_explosion = get_neighboring_tiles_within_distance(bomb_position, bomb_power, game_state)
+            next_explosion += bomb_position
+            explosion.update(next_explosion)
+    # Check if the current adjacent tile is blocked by an explosion, a bomb, a wall, or another agent,
+    # and mark it as "BLOCK" in the results if it is blocked.
+    for i, adjacent in enumerate(get_neighboring_tiles(current_position, 1)):
+        flag_explosion = adjacent in explosion or game_state["explosion_map"][adjacent[0]][adjacent[1]] != 0
+        flag_bomb = adjacent in bombs
+        neighboring_content = game_state["field"][adjacent[0]][adjacent[1]]
+        if neighboring_content != 0 or adjacent in other_agent_positions or flag_explosion or flag_bomb:
             results[i] = "BLOCK"
     return results
 
@@ -206,7 +205,7 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
     bombs_positions = [bomb[0] for bomb in game_state["bombs"]]
 
     # Get adjacent positions
-    adjacent_positions = get_neighboring_tiles_within_distance(current_position, 3, game_state)
+    adjacent_positions = get_neighboring_tiles_within_distance(current_position, bomb_power, game_state)
     adjacent_positions.append(current_position)
 
     # Check for a clear path without bomb explosion risk
@@ -219,7 +218,7 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
     # Power of the bomb
     effect = bomb_power
     for b in game_state["bombs"]:
-        exploded_tiles += get_neighboring_tiles_within_distance(b[0], 3, game_state)
+        exploded_tiles += get_neighboring_tiles_within_distance(b[0], bomb_power, game_state)
         if b[1] + 1 < effect:
             effect = b[1] + 1
 

@@ -161,11 +161,16 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
             self.exploration_rate_initial - self.exploration_rate_end) * np.exp(
         -self.exploration_decay_rate * self.episodes)
 
-    # TODO: Should I update the same Q-table instead of new one everytime?
+    # Update the existing Q-table
     q_table_folder = "Q_tables/"
-    if self.episodes % 250 == 0:
-        q_table_file = os.path.join(q_table_folder, f"Q_table-{self.timestamp}")
-        np.save(q_table_file, self.Q_table)
+    q_table_file = os.path.join(q_table_folder, f"Q_table-{self.name}.npy")
+    if os.path.exists(q_table_file):
+        existing_q_table = np.load(q_table_file)
+        existing_q_table[self.Q_table != 0] = self.Q_table[self.Q_table != 0]
+        self.Q_table = existing_q_table
+
+    # Save the updated Q-table to the file
+    np.save(q_table_file, self.Q_table)
 
     # Log exploration rate
     wandb.log({"Exploration_rate": self.exploration_rate}, step=int(self.episodes))
@@ -204,41 +209,28 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 def reward_from_events(self, events: List[str]) -> int:
     game_rewards = {
-        e.COIN_COLLECTED: 50,
-        e.KILLED_OPPONENT: 200,
-        COIN_SEARCH_YES: 30,
+        COIN_SEARCH_YES: 200,
         COIN_SEARCH_NO: -50,
 
-        e.CRATE_DESTROYED: 50,
-        CRATE_RADAR_HIGH: 30,
+        CRATE_RADAR_HIGH: 50,
         CRATE_RADAR_LOW: 10,
 
         BOMB_DISTANCE_NEAR: -10,
         BOMB_DISTANCE_FAR: 20,
-        BAD_BOMB_ACTION: -50,
-        GOOD_BOMB_ACTION: 20,
+        BAD_BOMB_ACTION: -500,
+        GOOD_BOMB_ACTION: 350,
         ESCAPE_BOMB_YES: 30,
         ESCAPE_BOMB_NO: -50,
 
-        AGENT_MOVEMENT_BLOCKED: -5,
+        AGENT_MOVEMENT_BLOCKED: -100,
 
-        e.KILLED_SELF: -10,
-        e.GOT_KILLED: -50,
-        e.OPPONENT_ELIMINATED: 5,
-
-        # e.SURVIVED_ROUND: 0,
-        # e.MOVED_LEFT: 3,
-        # e.MOVED_RIGHT: 3,
-        # e.MOVED_UP: 3,
-        # e.MOVED_DOWN: 3,
-        # e.BOMB_DROPPED: 5,
-        # e.BOMB_EXPLODED: 0,
-        # e.INVALID_ACTION: -1,
-        # e.COIN_FOUND: 0,
+        e.CRATE_DESTROYED: 200,
+        e.COIN_COLLECTED: 1000,
     }
+    self.logger.debug(f"reward_from_events: {events}")
     reward_sum = 0
     for event in events:
         if event in game_rewards:
             reward_sum += game_rewards[event]
-    # self.logger.debug(f"Awarded {reward_sum} for events {', '.join(events)}")
+    self.logger.debug(f"Awarded {reward_sum} for events {', '.join(events)}")
     return reward_sum
