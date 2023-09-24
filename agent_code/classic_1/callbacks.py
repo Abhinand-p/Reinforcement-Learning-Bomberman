@@ -275,7 +275,7 @@ def shortest_path_to_coin_or_crate(agent, game_state):
     good_coins = [coin for coin in game_state["coins"] if coin not in explosion_area]
     # agent.logger.info(f"shortest_path_to_coin_or_crate: good_coins: {good_coins}")
 
-    # If no coins and crates -> Random ?
+    # If no coins and crates -> Random?
     if not any(good_coins) and not any(crates):
         random_choice = np.random.choice(ACTIONS_IDEAS)
         agent.logger.info(f"shortest_path_to_coin_or_crate: No Coins and Crates {random_choice}")
@@ -420,21 +420,6 @@ def state_to_features(self, game_state) -> np.array:
     features_dict["Place_Bomb"] = check_bomb_presence(self, game_state)
 
     features_dict["Crate_Radar"] = check_crate_presence(game_state)
-
-    # features = np.zeros(10, dtype=np.int8)
-    # Calculate features
-    # wall_counter = count_walls(current_position, game_state, 3)
-    # bomb_present = check_bomb_presence(current_position, game_state, 3)
-    # agent_present = check_agent_presence(current_position, game_state, 3)
-    # death_tile = calculate_death_tile(game_state, current_position)
-    # features[0] = death_tile
-    # blockage_features = compute_blockage(game_state, current_position)
-    # features[1:5] = blockage_features
-    # visited_ratio = calculate_going_to_new_tiles(self.history)
-    # features[5] = visited_ratio
-    # Calculate feature_id based on features
-    # features = np.array([int(wall_counter > 2), int(bomb_present), int(agent_present), int(death_tile)])
-    # feature_id = 2 * features[0] + features[1] + 2 * features[2] + features[3]
 
     self.logger.info(f"Feature Dictionary: {features_dict}")
     for i, state in enumerate(self.valid_list):
