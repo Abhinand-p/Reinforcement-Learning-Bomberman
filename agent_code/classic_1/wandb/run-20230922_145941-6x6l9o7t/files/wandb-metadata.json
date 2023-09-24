@@ -1,0 +1,45 @@
+{
+    "os": "macOS-13.5.2-arm64-arm-64bit",
+    "python": "3.8.18",
+    "heartbeatAt": "2023-09-22T12:59:41.941202",
+    "startedAt": "2023-09-22T12:59:41.056091",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "play",
+        "--no-gui",
+        "--my-agent",
+        "classic_1",
+        "--train",
+        "1",
+        "--n-round",
+        "100"
+    ],
+    "state": "running",
+    "program": "main.py",
+    "codePathLocal": null,
+    "git": {
+        "remote": "https://github.com/Abhinand-p/bomberman_rl.git",
+        "commit": "7d52a61e8fa7123be4fced19c8ee515d93749ecc"
+    },
+    "email": "abhinand.po@gmail.com",
+    "root": "/Users/abhinandp/PycharmProjects/pythonProject1_development/bomberman_rl",
+    "host": "Abhinands-MBP",
+    "username": "abhinandp",
+    "executable": "/Users/abhinandp/miniconda3/envs/bomberman_rl/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "disk": {
+        "/": {
+            "total": 460.4317207336426,
+            "used": 8.545635223388672
+        }
+    },
+    "gpuapple": {
+        "type": "arm",
+        "vendor": "Apple"
+    },
+    "memory": {
+        "total": 16.0
+    }
+}
