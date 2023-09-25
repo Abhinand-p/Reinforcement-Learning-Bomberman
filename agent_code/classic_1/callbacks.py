@@ -4,9 +4,8 @@ import math
 import itertools
 
 from collections import deque
-from .features import check_bomb_presence, check_crate_presence, compute_blockage, calculate_going_to_new_tiles,\
+from .features import check_bomb_presence, check_crate_presence, compute_blockage, calculate_going_to_new_tiles, \
     shortest_path_to_coin_or_crate
-
 
 ACTIONS = ['UP', 'RIGHT', 'DOWN', 'LEFT', 'WAIT', 'BOMB']
 ACTIONS_IDEAS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
@@ -110,12 +109,12 @@ def state_to_features(self, game_state) -> np.array:
         self.logger.info(
             f"!!! state_to_features: calculate_going_to_new_tiles: Invalid direction: {bomb_safety_result}")
 
-    (features_dict["Up"], features_dict["Right"], features_dict["Down"], features_dict["Left"]) = compute_blockage(
-        game_state)
-
     features_dict["Place_Bomb"] = check_bomb_presence(self, game_state)
 
     features_dict["Crate_Radar"] = check_crate_presence(game_state)
+
+    (features_dict["Up"], features_dict["Right"], features_dict["Down"], features_dict["Left"]) = compute_blockage(
+        game_state)
 
     self.logger.info(f"Feature Dictionary: {features_dict}")
     for i, state in enumerate(self.valid_list):

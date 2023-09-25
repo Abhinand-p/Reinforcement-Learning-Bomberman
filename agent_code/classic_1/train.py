@@ -25,15 +25,11 @@ AGENT_MOVEMENT_BLOCKED = "AGENT_MOVEMENT_BLOCKED"
 BAD_BOMB_ACTION = "BAD_BOMB_ACTION"
 GOOD_BOMB_ACTION = "GOOD_BOMB_ACTION"
 
-# Custom Event: 4 -> Crate Radar
-CRATE_RADAR_HIGH = "CRATE_RADAR_HIGH"
-CRATE_RADAR_LOW = "CRATE_RADAR_LOW"
-
-# Custom Event: 5 -> Escape Bomb
+# Custom Event: 4 -> Escape Bomb
 ESCAPE_BOMB_YES = "ESCAPE_BOMB_YES"
 ESCAPE_BOMB_NO = "ESCAPE_BOMB_NO"
 
-# Custom Event: 6 -> Coin search
+# Custom Event: 5 -> Coin search
 COIN_SEARCH_YES = "COIN_SEARCH_YES"
 COIN_SEARCH_NO = "COIN_SEARCH_NO"
 
@@ -49,30 +45,29 @@ def setup_training(self):
     self.episodes = 0.0
     # Gathered return of rewards per episode
     self.episode_gathered_rewards = 0.0
-
+    # Transactions
     self.transitions = deque(maxlen=TRANSITION_HISTORY_SIZE)
-
     # Logging in wandb
     wandb.init(project="bomberman_rl", entity="abhinand-po")
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):
-    self.logger.debug(
-        f'Classic_1 Encountered game event(s) {", ".join(map(repr, events))} in step {new_game_state["step"]}')
-
-    self.history.append(new_game_state["self"][-1])
     old_state = self.old_state
     self.new_state = state_to_features(self, new_game_state)
     new_state = self.new_state
     previous_feature_dict = self.valid_list[old_state]
 
+    # Feature 1: Escape Bomb
     if previous_feature_dict["Direction_bomb"] != "SAFE":
         if self_action == previous_feature_dict["Direction_bomb"]:
             events.append(BOMB_DISTANCE_FAR)
         else:
             events.append(BOMB_DISTANCE_NEAR)
+    # --------------------------------
 
+    # Feature 2: Agent block feature
     if previous_feature_dict["Up"] == "BLOCK" and self_action == "UP":
+
         events.append(AGENT_MOVEMENT_BLOCKED)
     elif previous_feature_dict["Down"] == "BLOCK" and self_action == "DOWN":
         events.append(AGENT_MOVEMENT_BLOCKED)
@@ -80,21 +75,23 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
         events.append(AGENT_MOVEMENT_BLOCKED)
     elif previous_feature_dict["Left"] == "BLOCK" and self_action == "LEFT":
         events.append(AGENT_MOVEMENT_BLOCKED)
+    # --------------------------------
 
+    # Feature 3: Correct Bomb check
     if previous_feature_dict["Place_Bomb"] == 'NO' and self_action == "BOMB":
         events.append(BAD_BOMB_ACTION)
 
     if previous_feature_dict["Place_Bomb"] == 'YES' and previous_feature_dict["Direction_bomb"] == 'SAFE':
         if self_action == "BOMB":
             if previous_feature_dict["Crate_Radar"] == 'HIGH':
-                events.append(CRATE_RADAR_HIGH)
                 events.append(GOOD_BOMB_ACTION)
             elif previous_feature_dict["Crate_Radar"] == 'LOW':
-                events.append(CRATE_RADAR_LOW)
                 events.append(GOOD_BOMB_ACTION)
             else:
                 events.append(BAD_BOMB_ACTION)
+    # --------------------------------
 
+    # Feature 4: Escape bomb
     if previous_feature_dict["Direction_bomb"] != 'SAFE':
         escape_bomb = True
         if previous_feature_dict["Direction_bomb"] == 'UP' and previous_feature_dict["Up"] == "BLOCK":
@@ -108,10 +105,12 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
         if escape_bomb:
             if previous_feature_dict["Direction_bomb"] == self_action:
-                events.append(COIN_SEARCH_YES)
+                events.append(ESCAPE_BOMB_YES)
             else:
-                events.append(COIN_SEARCH_NO)
+                events.append(ESCAPE_BOMB_NO)
+    # --------------------------------
 
+    # Feature 5: Search Coin
         coin_collect = True
         if previous_feature_dict["Direction_coin/crate"] == 'UP' and previous_feature_dict["Up"] == "BLOCK":
             coin_collect = False
@@ -124,9 +123,11 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
 
         if coin_collect:
             if previous_feature_dict["Direction_coin/crate"] == self_action:
-                events.append(ESCAPE_BOMB_YES)
+                events.append(COIN_SEARCH_YES)
             else:
-                events.append(ESCAPE_BOMB_NO)
+                events.append(COIN_SEARCH_NO)
+
+    # --------------------------------
 
     reward = reward_from_events(self, events)
     self.transitions.append(Transition(old_state, self_action, new_state, reward))
@@ -176,29 +177,35 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
     # Log total rewards for the episode
     wandb.log({"Total_Rewards_Per_Episode": int(self.episode_gathered_rewards)}, step=int(self.episodes))
 
-    # Log additional metrics: AGENT_KILLED_SELF
-    if e.KILLED_SELF in events:
-        wandb.log({"AGENT_KILLED_SELF": 1}, step=int(self.episodes))
+    # Log additional metrics: BOMB_DISTANCE_FAR
+    if BOMB_DISTANCE_FAR in events:
+        wandb.log({"BOMB_DISTANCE_FAR": 1}, step=int(self.episodes))
     else:
-        wandb.log({"AGENT_KILLED_SELF": 0}, step=int(self.episodes))
-
-    # Log additional metrics: GOT_KILLED
-    if e.GOT_KILLED in events:
-        wandb.log({"AGENT_GOT_KILLED": 1}, step=int(self.episodes))
-    else:
-        wandb.log({"AGENT_GOT_KILLED": 0}, step=int(self.episodes))
-
-    # Log additional metrics: CRATE_DESTROYED
-    if e.CRATE_DESTROYED in events:
-        wandb.log({"AGENT_CRATE_DESTROYED": 1}, step=int(self.episodes))
-    else:
-        wandb.log({"AGENT_CRATE_DESTROYED": 0}, step=int(self.episodes))
+        wandb.log({"BOMB_DISTANCE_FAR": 0}, step=int(self.episodes))
 
     # Log additional metrics: AGENT_MOVEMENT_BLOCKED
-    if e.CRATE_DESTROYED in events:
+    if AGENT_MOVEMENT_BLOCKED in events:
         wandb.log({"AGENT_MOVEMENT_BLOCKED": 1}, step=int(self.episodes))
     else:
         wandb.log({"AGENT_MOVEMENT_BLOCKED": 0}, step=int(self.episodes))
+
+    # Log additional metrics: GOOD_BOMB_ACTION
+    if GOOD_BOMB_ACTION in events:
+        wandb.log({"GOOD_BOMB_ACTION": 1}, step=int(self.episodes))
+    else:
+        wandb.log({"GOOD_BOMB_ACTION": 0}, step=int(self.episodes))
+
+    # Log additional metrics: ESCAPE_BOMB_YES
+    if ESCAPE_BOMB_YES in events:
+        wandb.log({"ESCAPE_BOMB_YES": 1}, step=int(self.episodes))
+    else:
+        wandb.log({"ESCAPE_BOMB_YES": 0}, step=int(self.episodes))
+
+    # Log additional metrics: COIN_SEARCH_YES
+    if COIN_SEARCH_YES in events:
+        wandb.log({"COIN_SEARCH_YES": 1}, step=int(self.episodes))
+    else:
+        wandb.log({"COIN_SEARCH_YES": 0}, step=int(self.episodes))
 
     self.episode_gathered_rewards = 0
     self.episodes += 1
@@ -207,23 +214,19 @@ def end_of_round(self, last_game_state: dict, last_action: str, events: List[str
 
 def reward_from_events(self, events: List[str]) -> int:
     game_rewards = {
-        COIN_SEARCH_YES: 200,
-        COIN_SEARCH_NO: -50,
-
-        CRATE_RADAR_HIGH: 50,
-        CRATE_RADAR_LOW: 10,
-
         BOMB_DISTANCE_NEAR: -10,
         BOMB_DISTANCE_FAR: 20,
-        BAD_BOMB_ACTION: -500,
-        GOOD_BOMB_ACTION: 350,
-        ESCAPE_BOMB_YES: 30,
-        ESCAPE_BOMB_NO: -50,
 
         AGENT_MOVEMENT_BLOCKED: -100,
 
-        e.CRATE_DESTROYED: 200,
-        e.COIN_COLLECTED: 1000,
+        BAD_BOMB_ACTION: --100,
+        GOOD_BOMB_ACTION: 75,
+
+        ESCAPE_BOMB_YES: 75,
+        ESCAPE_BOMB_NO: -100,
+
+        COIN_SEARCH_YES: 75,
+        COIN_SEARCH_NO: -100,
     }
     self.logger.debug(f"reward_from_events: {events}")
     reward_sum = 0

@@ -48,7 +48,7 @@ def check_crate_presence(game_state) -> str:
 
     if crate_reward == 0:
         return 'LOW'
-    elif 1 <= crate_reward < 4:
+    elif 1 <= crate_reward < 5:
         return 'MID'
     else:
         return 'HIGH'
@@ -111,21 +111,16 @@ def compute_blockage(game_state: dict) -> List[str]:
 def calculate_going_to_new_tiles(self, game_state) -> str:
     # Get current position
     current_position = game_state["self"][-1]
-
     # Get Bomb positions
     bombs_positions = [bomb[0] for bomb in game_state["bombs"]]
-
     # Get adjacent positions
     adjacent_positions = get_neighboring_tiles_within_distance(current_position, bomb_power, game_state)
     adjacent_positions.append(current_position)
-
     # Check for a clear path without bomb explosion risk
     if not any([adjacent in bombs_positions for adjacent in adjacent_positions]):
         return "SAFE"
-
     # Calculate tiles affected by bomb explosions and determine reach
     exploded_tiles = [current_position]
-
     # Power of the bomb
     effect = bomb_power + 2
     for b in game_state["bombs"]:
@@ -135,9 +130,8 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
 
     graph = calculate_adjacency_matrix(self, game_state)
     adjacent_positions = get_neighboring_tiles(current_position, effect)
-
     shortest_path = None
-    shortest_distance = 10000
+    shortest_distance = 10000  # Initial assuming very large number
 
     # Find the shortest safe path to a reachable tile
     for adjacent in adjacent_positions:
@@ -159,31 +153,24 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
         return "NO_OTHER_OPTION"
 
     return_action = select_best_action(self, current_position, shortest_path)
-    self.logger.info(f"calculate_going_to_new_tiles: Action returned {return_action}")
+    # self.logger.info(f"calculate_going_to_new_tiles: Action returned {return_action}")
     return return_action
 
 
 # Feature 7: Calculating the direction to coin/crate
 def shortest_path_to_coin_or_crate(agent, game_state):
-    graph = calculate_adjacency_matrix(agent, game_state)
-    graph_with_crates = calculate_adjacency_matrix(agent, game_state, consider_crates=False)
-
     # current coordinate Classic_1 agent
     current_position = game_state["self"][-1]
-    # agent.logger.info(f"shortest_path_to_coin_or_crate: current_position: {current_position}")
-
     # Extract explosion area positions.
     explosion_area = [(index[0], index[1]) for index, field in np.ndenumerate(game_state["explosion_map"]) if
                       field != 0]
-    # agent.logger.info(f"shortest_path_to_coin_or_crate: explosion_area: {explosion_area}")
-
     # Crates present that are not yet exploded.
     crates = [(index[0], index[1]) for index, field in np.ndenumerate(game_state["field"]) if field == 1]
-    # agent.logger.info(f"shortest_path_to_coin_or_crate: crates: {crates}")
-
     # Good Coins are those that are not in the explosion_area
     good_coins = [coin for coin in game_state["coins"] if coin not in explosion_area]
-    # agent.logger.info(f"shortest_path_to_coin_or_crate: good_coins: {good_coins}")
+    # Adjacency matrix's
+    graph = calculate_adjacency_matrix(agent, game_state)
+    graph_with_crates = calculate_adjacency_matrix(agent, game_state, consider_crates=False)
 
     # If no coins and crates -> Random?
     if not any(good_coins) and not any(crates):
@@ -199,7 +186,6 @@ def shortest_path_to_coin_or_crate(agent, game_state):
             try:
                 current_path, current_path_length = find_shortest_path_coordinates(graph_with_crates, current_position,
                                                                                    crate_coord)
-
             except net.exception.NetworkXNoPath:
                 agent.logger.info("shortest_path_to_coin_or_crate: Crate may be exploded")
                 continue
@@ -237,37 +223,34 @@ def shortest_path_to_coin_or_crate(agent, game_state):
                     agent.logger.info("shortest_path_to_coin_or_crate: Corner case 1")
                     continue
 
-            # If there are no other agents alive
+            # If no other agent alive
             if not any(game_state["others"]):
                 coin_path.append(((current_path, current_path_length, current_reachable), (None, np.inf)))
                 continue
 
             for other_agent in game_state["others"]:
-                best_other_agent = (None, np.inf)
+                other_agent_path = (None, np.inf)
                 other_agent_coord = other_agent[3]
                 try:
-                    current_path_other_agent, current_path_length_other_agent = find_shortest_path_coordinates(graph,
-                                                                                                               other_agent_coord,
-                                                                                                               coin_coord)
-                    current_other_agent_reachable = True
-
+                    current_path_other_agent, current_path_length_other_agent = find_shortest_path_coordinates(
+                        graph, other_agent_coord, coin_coord)
+                    agent_reachable = True
                 except net.exception.NetworkXNoPath:
                     try:
                         current_path_other_agent, current_path_length_other_agent = find_shortest_path_coordinates(
                             graph_with_crates, other_agent_coord, coin_coord)
-                        current_other_agent_reachable = False
-
+                        agent_reachable = False
                     except net.exception.NetworkXNoPath:
                         agent.logger.info("shortest_path_to_coin_or_crate: Corner case 2")
                         continue
 
-                if not current_other_agent_reachable:
-                    current_path_length_other_agent += 7
+                if not agent_reachable:
+                    current_path_length_other_agent += 8
 
-                if current_path_length_other_agent < best_other_agent[1]:
-                    best_other_agent = (
-                        current_path_other_agent, current_path_length_other_agent, current_other_agent_reachable)
-            coin_path.append(((current_path, current_path_length, current_reachable), best_other_agent))
+                if current_path_length_other_agent < other_agent_path[1]:
+                    other_agent_path = (
+                        current_path_other_agent, current_path_length_other_agent, agent_reachable)
+            coin_path.append(((current_path, current_path_length, current_reachable), other_agent_path))
 
         # If no coins are still not reachable
         if not any(coin_path):
