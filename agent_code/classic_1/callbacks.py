@@ -4,7 +4,6 @@ import math
 import itertools
 import re
 
-from collections import deque
 from .features import check_bomb_presence, check_crate_presence, compute_blockage, calculate_going_to_new_tiles, \
     shortest_path_to_coin_or_crate
 
