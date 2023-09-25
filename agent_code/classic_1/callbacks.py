@@ -43,6 +43,7 @@ def act(self, game_state: dict) -> str:
     state = self.old_state
     self.logger.info(f"act: State: {state}")
 
+    # Idea: Exploration only when training.
     if self.train and np.random.random() < self.exploration_rate:
         action = np.random.choice(ACTIONS)
         self.logger.info(f"act: Exploring: {action}")
