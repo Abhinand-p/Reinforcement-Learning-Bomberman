@@ -23,7 +23,9 @@ AGENT_MOVEMENT_BLOCKED = "AGENT_MOVEMENT_BLOCKED"
 
 # Custom Event: 3 -> Bad Bomb action
 BAD_BOMB_ACTION = "BAD_BOMB_ACTION"
+OK_BOMB_ACTION = "OK_BOMB_ACTION"
 GOOD_BOMB_ACTION = "GOOD_BOMB_ACTION"
+VERY_GOOD_BOMB_ACTION = "VERY_GOOD_BOMB_ACTION"
 
 # Custom Event: 4 -> Escape Bomb
 ESCAPE_BOMB_YES = "ESCAPE_BOMB_YES"
@@ -33,6 +35,8 @@ ESCAPE_BOMB_NO = "ESCAPE_BOMB_NO"
 COIN_SEARCH_YES = "COIN_SEARCH_YES"
 COIN_SEARCH_NO = "COIN_SEARCH_NO"
 
+# Custom Event: 6 -> Crate destruction
+CRATE_DESTRUCTION = "CRATE_DESTRUCTION"
 
 def setup_training(self):
     # Initial exploration rate for training
@@ -77,14 +81,14 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
     # Feature 3: Correct Bomb check
     if previous_feature_dict["Place_Bomb"] == 'NO' and self_action == "BOMB":
         events.append(BAD_BOMB_ACTION)
-    if previous_feature_dict["Place_Bomb"] == 'YES' and previous_feature_dict["Direction_bomb"] == 'SAFE':
-        if self_action == "BOMB":
-            if previous_feature_dict["Crate_Radar"] == 'HIGH':
-                events.append(GOOD_BOMB_ACTION)
-            elif previous_feature_dict["Crate_Radar"] == 'LOW':
-                events.append(GOOD_BOMB_ACTION)
-            else:
-                events.append(BAD_BOMB_ACTION)
+    if previous_feature_dict["Place_Bomb"] == 'YES' and previous_feature_dict["Direction_bomb"] == 'SAFE' and \
+            self_action == "BOMB":
+        if previous_feature_dict["Crate_Radar"] == 'HIGH':
+            events.append(VERY_GOOD_BOMB_ACTION)
+        elif previous_feature_dict["Crate_Radar"] == 'MID':
+            events.append(GOOD_BOMB_ACTION)
+        elif previous_feature_dict["Crate_Radar"] == 'LOW':
+            events.append(OK_BOMB_ACTION)
     # --------------------------------
     # Feature 4: Escape bomb
     if previous_feature_dict["Direction_bomb"] != 'SAFE':
@@ -104,20 +108,22 @@ def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_
                 events.append(ESCAPE_BOMB_NO)
     # --------------------------------
     # Feature 5: Search Coin
-        coin_collect = True
-        if previous_feature_dict["Direction_coin/crate"] == 'UP' and previous_feature_dict["Up"] == "BLOCK":
-            coin_collect = False
-        if previous_feature_dict["Direction_coin/crate"] == 'RIGHT' and previous_feature_dict["Right"] == "BLOCK":
-            coin_collect = False
-        if previous_feature_dict["Direction_coin/crate"] == 'DOWN' and previous_feature_dict["Down"] == "BLOCK":
-            coin_collect = False
-        if previous_feature_dict["Direction_coin/crate"] == 'LEFT' and previous_feature_dict["Left"] == "BLOCK":
-            coin_collect = False
-        if coin_collect:
-            if previous_feature_dict["Direction_coin/crate"] == self_action:
-                events.append(COIN_SEARCH_YES)
-            else:
-                events.append(COIN_SEARCH_NO)
+    coin_collect = True
+    if previous_feature_dict["Direction_bomb"] != 'SAFE':
+        coin_collect = False
+    if previous_feature_dict["Direction_coin/crate"] == 'UP' and previous_feature_dict["Up"] == "BLOCK":
+        coin_collect = False
+    if previous_feature_dict["Direction_coin/crate"] == 'RIGHT' and previous_feature_dict["Right"] == "BLOCK":
+        coin_collect = False
+    if previous_feature_dict["Direction_coin/crate"] == 'DOWN' and previous_feature_dict["Down"] == "BLOCK":
+        coin_collect = False
+    if previous_feature_dict["Direction_coin/crate"] == 'LEFT' and previous_feature_dict["Left"] == "BLOCK":
+        coin_collect = False
+    if coin_collect:
+        if previous_feature_dict["Direction_coin/crate"] == self_action:
+            events.append(COIN_SEARCH_YES)
+        else:
+            events.append(COIN_SEARCH_NO)
     # --------------------------------
     reward = reward_from_events(self, events)
     self.transitions.append(Transition(old_state, self_action, new_state, reward))
@@ -176,14 +182,18 @@ def reward_from_events(self, events: List[str]) -> int:
 
         AGENT_MOVEMENT_BLOCKED: -100,
 
-        BAD_BOMB_ACTION: -100,
-        GOOD_BOMB_ACTION: 75,
+        BAD_BOMB_ACTION: -75,
+        OK_BOMB_ACTION: 25,
+        GOOD_BOMB_ACTION: 70,
+        VERY_GOOD_BOMB_ACTION: 125,
 
         ESCAPE_BOMB_YES: 75,
         ESCAPE_BOMB_NO: -100,
 
-        COIN_SEARCH_YES: 75,
+        COIN_SEARCH_YES: 50,
         COIN_SEARCH_NO: -100,
+
+        CRATE_DESTRUCTION: 50
     }
     self.logger.debug(f"reward_from_events: {events}")
     reward_sum = 0

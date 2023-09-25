@@ -5,7 +5,7 @@ import numpy as np
 from typing import List
 from settings import BOMB_POWER
 from .support import get_neighboring_tiles, get_neighboring_tiles_within_distance, calculate_adjacency_matrix, \
-    find_shortest_path_coordinates, select_best_action
+    find_shortest_path_coordinates, select_best_action, get_tiles_direct
 
 ACTIONS_IDEAS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
 bomb_power = BOMB_POWER
@@ -22,7 +22,7 @@ def count_walls(current_position, game_state, radius):
 
 # Feature 2: Check for bomb presence in the immediate surrounding tiles within a given radius.
 def check_bomb_presence(self, game_state) -> str:
-    if game_state["round"] == 1 or not game_state["self"][2]:
+    if not game_state["self"][2]:
         return 'NO'
 
     new_game_state = cp.deepcopy(game_state)
@@ -50,7 +50,7 @@ def check_crate_presence(game_state) -> str:
         return 'LOW'
     elif 1 <= crate_reward < 5:
         return 'MID'
-    else:
+    elif crate_reward >= 5:
         return 'HIGH'
 
 
@@ -129,9 +129,9 @@ def calculate_going_to_new_tiles(self, game_state) -> str:
             effect = b[1] + 1
 
     graph = calculate_adjacency_matrix(self, game_state)
-    adjacent_positions = get_neighboring_tiles(current_position, effect)
+    adjacent_positions = get_tiles_direct(current_position, effect)
     shortest_path = None
-    shortest_distance = 10000  # Initial assuming very large number
+    shortest_distance = 10000  # Initial assuming a very large number
 
     # Find the shortest safe path to a reachable tile
     for adjacent in adjacent_positions:

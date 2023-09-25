@@ -121,3 +121,10 @@ def select_best_action(self, current_coord, next_coords) -> str:
             return "UP"
         elif current_coord[1] + 1 == next_coord[1]:
             return "DOWN"
+
+
+def get_tiles_direct(own_coord, radius: int) -> List[Tuple[int]]:
+    own_coord_x, own_coord_y = own_coord
+    neighboring_coordinates = [(own_coord_x + x, own_coord_y + y) for x in range(radius + 1) for y in range(radius + 1 - x) if
+                               x <= 15 and y <= 15]
+    return list(set(neighboring_coordinates))
