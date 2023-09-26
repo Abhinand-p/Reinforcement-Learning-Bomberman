@@ -44,7 +44,7 @@ def setup_training(self):
     # Transactions
     self.transitions = deque(maxlen=TRANSITION_HISTORY_SIZE)
     # Logging in wandb
-    wandb.init(project="bomberman_rl", entity="abhinand-po")
+    wandb.init(project="bomberman_rl", entity="github")
 
 
 def game_events_occurred(self, old_game_state: dict, self_action: str, new_game_state: dict, events: List[str]):
